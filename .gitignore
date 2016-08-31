@@ -1,8 +1,10 @@
-# Object files
+# Files
 *.dim
 *.type
 *.bin
+*.*~
 
 # Folder
 work
 data
+experiments

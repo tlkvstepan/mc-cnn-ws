@@ -34,29 +34,12 @@ function utils.fromfile(fname)
    
 end
 
-function utils.read_log(filename, sep)
-  local file = io.open(filename)
-  table = {}
-  if file then
-      nline = 0
-      for line in file:lines() do
-        nline = nline + 1; 
-        table[nline] = {}
-        nsub_line = 0
-        for sub_line in string.gmatch(inputstr, "([^"..sep.."]+)") do
-            nsub_line = nsub_line + 1
-            table[nline][nsub_line] = sub_line
-        end
-      end
-  end
-end
-
-function utils.save_tensor(filename, tensor)
+--function utils.n_tensor(filename, tensor)
  
-  tensor:add(-tensor:min())
-  tensor:div(tensor:max()-tensor:min())
-  image.save(filename, torch.squeeze(tensor));
+--  tensor:add(-tensor:min())
+--  tensor:div(tensor:max()-tensor:min())
+--  image.save(filename, torch.squeeze(tensor));
 
-end
+--end
 
 return utils

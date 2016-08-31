@@ -120,8 +120,11 @@
     local ref_epi = self:get_epi(torch.Tensor(id_ref), self.img1_arr)
     local pos_epi = self:get_epi(torch.Tensor(id_ref), self.img2_arr)
     local neg_epi = self:get_epi(torch.Tensor(id), self.img2_arr)
-    inputs = {ref_epi[{{},{},{self.disp_max+1,ref_epi:size(3)}}], pos_epi, neg_epi}   
-    targets = torch.ones(nb_indices, self.img_w - self.disp_max - 2*self.hpatch)
+    --inputs = {ref_epi[{{},{},{self.disp_max+1,ref_epi:size(3)}}], pos_epi, neg_epi}   
+    inputs = {ref_epi, pos_epi, neg_epi}   
+    
+    --targets = torch.ones(nb_indices, self.img_w - self.disp_max - 2*self.hpatch)
+    --targets = torch.ones(nb_indices, 2*(self.img_w - self.disp_max - 2*self.hpatch))
     
     return inputs, targets;
 

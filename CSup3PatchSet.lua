@@ -31,6 +31,33 @@ function sup3PatchSet:__init(img1_arr, img2_arr, disp_arr, hpatch)
   
 end
 
+function sup3PatchSet:vis_3_patch(refPatch, posPatch, negPatch, ind)
+  -- ref, pos, neg are tensors nb_patches x h x w 
+  local h = refPatch:size(2)
+  local nb_patch = ind:numel() > 30 and 30 or ind:numel()  
+  local w = refPatch:size(3)
+  local im = torch.Tensor((h+3)*nb_patch, 3*(w+3));
+  for nsample = 1,nb_patch do
+      
+      local patch1 = torch.squeeze(refPatch[{{ind[nsample]},{},{}}])
+      local patch2 = torch.squeeze(posPatch[{{ind[nsample]},{},{}}])
+      local patch3 = torch.squeeze(negPatch[{{ind[nsample]},{},{}}])
+      
+      patch1:add(-patch1:min())
+      patch1:div(patch1:max()-patch1:min())
+      patch2:add(-patch2:min())
+      patch2:div(patch2:max()-patch2:min())
+      patch3:add(-patch3:min())
+      patch3:div(patch3:max()-patch3:min())
+        
+      local line = torch.cat({patch1, torch.zeros(h,3),
+                   patch2, torch.zeros(h,3), patch3,torch.zeros(h,3)}, 2)
+      im[{{(nsample-1)*(h+3)+1,(nsample)*(h+3)},{}}] = torch.cat({line, torch.zeros(3,3*(w+3))},1);          
+      
+  end
+  return im;
+end
+
 
 function sup3PatchSet:pair_col_row_2_id(pair, col, row) 
   
@@ -161,16 +188,17 @@ function sup3PatchSet:index(indices, inputs, targets)
     As negative example we select from the same epipolar line |half of patch|
     ]]--
     
+    local disp_diff = {}    
     for n = 1, nb_indices do
       id_ref[n] = self.id[indices[n]]
       local pair_ref, col_ref, row_ref = self:id_2_pair_col_row(id_ref[n])
       local gt_disp = torch.squeeze(self.disp_arr[{{pair_ref},{row_ref},{col_ref}}]);
-      local disp
       repeat
         local cur_disp_max = (col_ref - self.hpatch - 1) < self.disp_max and col_ref - self.hpatch - 1 or self.disp_max
-        disp = math.random(0, cur_disp_max )
-      until ( disp ~= gt_disp ) 
-      id_neg[n] = self:pair_col_row_2_id(pair_ref, col_ref - disp, row_ref); 
+        wrong_disp = math.random(0, cur_disp_max )
+      until ( wrong_disp ~= gt_disp ) 
+      disp_diff[n] = torch.abs(wrong_disp - gt_disp);
+      id_neg[n] = self:pair_col_row_2_id(pair_ref, col_ref - wrong_disp, row_ref); 
       id_pos[n] = self:pair_col_row_2_id(pair_ref, col_ref - gt_disp, row_ref); 
     end  
     
@@ -182,9 +210,8 @@ function sup3PatchSet:index(indices, inputs, targets)
     local pos_patch = self:get_patch(id_pos, self.img2_arr)
     local neg_patch = self:get_patch(id_neg, self.img2_arr)
     
-    inputs = {ref_patch, pos_patch, neg_patch}   
-    targets = torch.ones(1,nb_indices)
-      
+    inputs = {ref_patch, pos_patch, neg_patch, torch.Tensor(disp_diff)}   
+          
    return inputs, targets
 end
 

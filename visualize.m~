@@ -11,4 +11,4 @@ plot(result_batch(:,2)); hold on
 plot(result_doubleBatch(:,2));
 ylabel('Test error N(x^{+} > x^{-})/N')
 xlabel('epoch# (256x5 epipolar lines each)')
-legend({'batch', 'doubleBatch'})
+legend({'
