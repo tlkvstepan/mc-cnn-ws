@@ -18,9 +18,9 @@ math.randomseed(0);
 
 -- |parameteres|
 -- learning
-local test_set_size = 100;       -- 50000 
-local batch_size = 2             -- 512
-local epoch_size = batch_size*1  -- 100
+local test_set_size = 10000;       -- 50000 
+local batch_size = 512             -- 512
+local epoch_size = batch_size*1    -- 100
 local nb_epoch = 10000;            -- 10000
 -- loss
 local margin = 0.2;
@@ -37,6 +37,9 @@ if( gpu_on ) then
   require 'cunn'
 end
 
+--fnet0 = torch.load('work/largeScale_fnet.t7', 'ascii')
+--local param0, grad0 = fnet0:getParameters()
+
 
 -- |read data| from all KITTI
 local img1_arr = torch.cat({torch.squeeze(utils.fromfile('data/KITTI12/x0.bin')),
@@ -51,10 +54,10 @@ local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
 -- |define network|
-local model = mcCnnFst(nbConvLayers, nbFeatureMap, kernel)
-local hpatch = model.hpatch;
-local _TR_NET_ = model:getMilNetDoubleBatch(img_w, disp_max) 
-local _TE_NET_ = model:getTripletNet() 
+_MODEL_ = mcCnnFst(nbConvLayers, nbFeatureMap, kernel)
+local hpatch = _MODEL_.hpatch;
+_TR_NET_ = _MODEL_:getMilNetDoubleBatch(img_w, disp_max) 
+_TE_NET_ = _MODEL_:getTripletNet() 
 
 if gpu_on then
   _TR_NET_:cuda()
@@ -62,6 +65,7 @@ if gpu_on then
 end
 _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 _TE_PPARAM_, _TE_PGRAD_ = _TE_NET_:getParameters()
+--_TR_PPARAM_:copy(param0);
 
 -- |define datasets|
 local trainSet = dl.unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
@@ -202,8 +206,12 @@ for nepoch = 1, nb_epoch do
   local test_acc, test_acc_le2, test_acc_le5, err_index, disp_diff  = ftest()
   local train_err = torch.Tensor(sample_err):mean();
 
+  local end_time = os.time()
+  local time_diff = os.difftime(end_time,start_time);
+
   -- save debug info
   if debug then
+    
     -- save errorneous test samples
     local fail_img = utils.vis_errors(_TE_INPUT_[1]:float(), 
       _TE_INPUT_[2]:float(), 
@@ -211,23 +219,22 @@ for nepoch = 1, nb_epoch do
     image.save('work/'..suffix..'failure.jpg',fail_img)
 
     -- save net
-    local fNet = model:getFeatureNet()
+    local fNet = _MODEL_:getFeatureNet()
     local param = fNet:getParameters()
     param:copy(_TR_PPARAM_)
     torch.save('work/'..suffix..'fnet.t7', fNet, 'ascii');
-  end
-
-  local end_time = os.time()
-  local time_diff = os.difftime(end_time,start_time);
-
-  print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc))
-
-  -- make logger 
-  if debug then
+    
+    -- save log
     logger:add{train_err, test_acc, test_acc_le2, test_acc_le5}
     logger:plot()
+    
+    -- save distance matrices
+    local refPos = utils.scale2_01(_MODEL_.hook_refPos:clone())
+    image.save('work/'..suffix..'dist_ref_pos.jpg',refPos)
+    
   end
-
+  
+  print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc))
   collectgarbage()
 
 end

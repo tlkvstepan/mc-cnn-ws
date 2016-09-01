@@ -34,6 +34,10 @@ function utils.fromfile(fname)
    
 end
 
+function utils.scale2_01(im)
+return im:add(-im:min()):div(im:max()-im:min());
+end
+  
 function utils.vis_errors(p1, p2, p3, err_idx, text)
   
   -- ref, pos, neg are tensors nb_patches x h x w that we want to visualize 

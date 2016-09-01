@@ -1,5 +1,6 @@
-1. make use of second matrix
-2. plot distance from the correct positions for errors
+*1. make use of second matrix
+*2. plot distance from the correct positions for errors
+3. visualize distance matrix
 3. large scale learning (all KITTI)
 4. tune stereo paremeters for our descriptor
 5. compare against mc-cnn on stereo
