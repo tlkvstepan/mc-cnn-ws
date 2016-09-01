@@ -63,7 +63,7 @@
     
     local epi = torch.Tensor(id:numel(), 2*self.hpatch+1, self.img_w)
     for n = 1,id:numel() do
-      epi[{{n},{},{}}] = img[{{pair[n]},{row_min[n],row_max[n]},{}}];
+      epi[{{n},{},{}}] = img[{{pair[n]},{row_min[n],row_max[n]},{}}]:double();
     end
     return epi;
   
