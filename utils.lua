@@ -38,7 +38,7 @@ function utils.mask(im, disp_max)
   
   im_new = im:clone()
   img_w = im_new:size(2)
-  local mask = 1*torch.ones(img_w, img_w)  
+  local mask = torch.ones(img_w, img_w)  
   mask = torch.triu(torch.tril(mask,-1),-disp_max)
   im_new:cmul(mask);
   mask:mul(im_new:min())
@@ -72,19 +72,22 @@ function utils.vis_errors(p1, p2, p3, err_idx, text)
   
   -- ref, pos, neg are tensors nb_patches x h x w that we want to visualize 
   -- txt it table text we put on each patch row
-  
+ 
+  print(err_idx)
+ 
   local h = p1:size(2)
   local w = p1:size(3)
   local nb_patch = err_idx:size(1)
   
   local max_nb_patch = 30
-  local im = torch.Tensor(3,(h+3)*nb_patch, 3*(w+3)+2*w);
-  
+   
   -- reshuffle all errorneous patches
   local idx = torch.LongTensor():randperm(nb_patch)
   if( nb_patch > max_nb_patch ) then
     nb_patch = max_nb_patch
   end
+  
+  local im = torch.Tensor(3,(h+3)*nb_patch, 3*(w+3)+2*w);
   idx = idx[{{1,nb_patch}}];
   
   for nsample = 1,nb_patch do

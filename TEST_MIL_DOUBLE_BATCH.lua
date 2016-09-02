@@ -18,10 +18,10 @@ math.randomseed(0);
 
 -- |parameteres|
 -- learning
-local test_set_size = 1000;       -- 50000 
+local test_set_size = 50000;       -- 50000 
 local batch_size = 1           -- 512
 local epoch_size = batch_size*1    -- 100
-local nb_epoch = 10000;            -- 10000
+local nb_epoch = 1;            -- 10000
 -- loss
 local margin = 0.2;
 -- network
@@ -30,7 +30,7 @@ kernel = 3;
 nbConvLayers = 5;
 -- debug
 local suffix = 'test_'
-local gpu_on = false;
+local gpu_on = true;
 local debug = true;
 
 if( gpu_on ) then
@@ -39,7 +39,6 @@ end
 
 fnet0 = torch.load('work/largeScale_fnet.t7', 'ascii')
 local param0, grad0 = fnet0:getParameters()
-
 
 -- |read data| from all KITTI
 local img1_arr = torch.cat({torch.squeeze(utils.fromfile('data/KITTI12/x0.bin')),
@@ -217,10 +216,10 @@ for nepoch = 1, nb_epoch do
   if debug then
     
     -- save errorneous test samples
-    local fail_img = utils.vis_errors(_TE_INPUT_[1]:float(), 
-      _TE_INPUT_[2]:float(), 
-      _TE_INPUT_[3]:float(), err_index, disp_diff)
-    image.save('work/'..suffix..'failure.jpg',fail_img)
+    local fail_img = utils.vis_errors(_TE_INPUT_[1]:float():clone(), 
+      _TE_INPUT_[2]:float():clone(), 
+      _TE_INPUT_[3]:float():clone(), err_index, disp_diff)
+    image.save('work/'..suffix..'failure.png',fail_img)
 
     -- save net
     local fNet = _MODEL_:getFeatureNet()
@@ -233,11 +232,13 @@ for nepoch = 1, nb_epoch do
     logger:plot()
     
     -- save distance matrices
-    refPos = _TR_NET_:get(2):get(1):get(2).output:clone();
+    input = trainSet:index(torch.Tensor{290})
+    _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
+    refPos = _TR_NET_:get(2):get(1):get(2).output:clone():float();
     refPos = utils.mask(refPos,disp_max)
     refPos = utils.softmax(refPos)
     refPos = utils.scale2_01(refPos)
-    image.save('work/'..suffix..'dist_ref_pos.jpg',refPos)
+    image.save('work/'..suffix..'dist_ref_pos.png',refPos)
     
   end
   
