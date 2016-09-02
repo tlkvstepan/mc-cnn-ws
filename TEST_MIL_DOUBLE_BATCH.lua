@@ -18,8 +18,8 @@ math.randomseed(0);
 
 -- |parameteres|
 -- learning
-local test_set_size = 100;       -- 50000 
-local batch_size = 2             -- 512
+local test_set_size = 1000;       -- 50000 
+local batch_size = 1           -- 512
 local epoch_size = batch_size*1    -- 100
 local nb_epoch = 10000;            -- 10000
 -- loss
@@ -37,8 +37,8 @@ if( gpu_on ) then
   require 'cunn'
 end
 
---fnet0 = torch.load('work/largeScale_fnet.t7', 'ascii')
---local param0, grad0 = fnet0:getParameters()
+fnet0 = torch.load('work/largeScale_fnet.t7', 'ascii')
+local param0, grad0 = fnet0:getParameters()
 
 
 -- |read data| from all KITTI
@@ -53,6 +53,10 @@ local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.
 local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
+--print('Max disparity '.. disp_max.. '\n')
+--print('Image width ' .. img_w ..'\n')
+
+
 -- |define network|
 _MODEL_ = mcCnnFst(nbConvLayers, nbFeatureMap, kernel)
 local hpatch = _MODEL_.hpatch;
@@ -65,7 +69,7 @@ if gpu_on then
 end
 _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 _TE_PPARAM_, _TE_PGRAD_ = _TE_NET_:getParameters()
---_TR_PPARAM_:copy(param0);
+_TR_PPARAM_:copy(param0);
 
 -- |define datasets|
 local trainSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
@@ -229,7 +233,8 @@ for nepoch = 1, nb_epoch do
     logger:plot()
     
     -- save distance matrices
-    local refPos = _MODEL_.hook_refPos:clone();
+    refPos = _TR_NET_:get(2):get(1):get(2).output:clone();
+    refPos = utils.mask(refPos,disp_max)
     refPos = utils.softmax(refPos)
     refPos = utils.scale2_01(refPos)
     image.save('work/'..suffix..'dist_ref_pos.jpg',refPos)

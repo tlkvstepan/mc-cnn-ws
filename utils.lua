@@ -34,9 +34,23 @@ function utils.fromfile(fname)
    
 end
 
+function utils.mask(im, disp_max)
+  
+  im_new = im:clone()
+  img_w = im_new:size(2)
+  local mask = 1*torch.ones(img_w, img_w)  
+  mask = torch.triu(torch.tril(mask,-1),-disp_max)
+  im_new:cmul(mask);
+  mask:mul(im_new:min())
+  mask:add(-im_new:min())
+  im_new:add(-mask)
+  
+return im_new
+end
+
 function utils.softmax(im)
-  im_new = im:clone();
-  cols_max = im_new:max(2);
+  im_new = im:clone()
+  cols_max = im_new:max(2)
   im_new:add(-torch.repeatTensor(cols_max,1,im_new:size(2)))
   im_new:exp()
   cols_sum = im_new:sum(2)
@@ -48,7 +62,7 @@ end
 function utils.scale2_01(im)
   
   local im_scale = im:clone()
-  im_scale:add(-im_scale:min()):div(im_scale:max()-im_scale:min());
+  im_scale:add(-im_scale:min()):div(im_scale:max()-im_scale:min())
   
 return im_scale
 
