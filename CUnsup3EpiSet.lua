@@ -11,8 +11,8 @@
  
 ]]--
 
-  local dl = require 'dataload'
-  local unsup3EpiSet = torch.class('dl.unsup3EpiSet', 'dl.DataLoader', dl)
+ --dofile('DataLoader.lua');
+  local unsup3EpiSet = torch.class('unsup3EpiSet', 'DataLoader')
 
   function unsup3EpiSet:__init( img1_arr, img2_arr, hpatch, disp_max)
     

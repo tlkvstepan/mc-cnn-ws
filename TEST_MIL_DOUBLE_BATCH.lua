@@ -5,7 +5,7 @@ require 'nn'
 
 torch.setdefaulttensortype('torch.FloatTensor')
 
-local dl = require 'dataload'
+dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
 dofile('CSup3PatchSet.lua');
 dofile('CMcCnnFst.lua');
@@ -18,8 +18,8 @@ math.randomseed(0);
 
 -- |parameteres|
 -- learning
-local test_set_size = 10000;       -- 50000 
-local batch_size = 512             -- 512
+local test_set_size = 100;       -- 50000 
+local batch_size = 2             -- 512
 local epoch_size = batch_size*1    -- 100
 local nb_epoch = 10000;            -- 10000
 -- loss
@@ -68,8 +68,8 @@ _TE_PPARAM_, _TE_PGRAD_ = _TE_NET_:getParameters()
 --_TR_PPARAM_:copy(param0);
 
 -- |define datasets|
-local trainSet = dl.unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
-local testSet = dl.sup3PatchSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
+local trainSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
+local testSet = sup3PatchSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
 
 -- |prepare test set|
 _TE_INPUT_, target = testSet:index(torch.range(1, test_set_size))
@@ -229,7 +229,9 @@ for nepoch = 1, nb_epoch do
     logger:plot()
     
     -- save distance matrices
-    local refPos = utils.scale2_01(_MODEL_.hook_refPos:clone())
+    local refPos = _MODEL_.hook_refPos:clone();
+    refPos = utils.softmax(refPos)
+    refPos = utils.scale2_01(refPos)
     image.save('work/'..suffix..'dist_ref_pos.jpg',refPos)
     
   end

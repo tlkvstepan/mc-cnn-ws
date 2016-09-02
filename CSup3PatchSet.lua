@@ -9,8 +9,8 @@
   _negPatch_ is not conjugate patch for _refEpi_.
  
 ]]--
-local dl = require 'dataload'
-local sup3PatchSet = torch.class('dl.sup3PatchSet', 'dl.DataLoader', dl)
+--dofile('DataLoader.lua');
+local sup3PatchSet = torch.class('sup3PatchSet', 'DataLoader')
 local image = require 'image'
 
 function sup3PatchSet:__init(img1_arr, img2_arr, disp_arr, hpatch)
