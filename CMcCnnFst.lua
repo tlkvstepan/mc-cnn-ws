@@ -116,7 +116,7 @@ local seqRefPosMask = nn.Sequential()
 local seqRefNegMask = nn.Sequential()
 parRefPosRefNeg:add(seqRefPosMask)
 parRefPosRefNeg:add(seqRefNegMask)
-local mask = 2*torch.ones(img_w-2*self.hpatch, img_w-2*self.hpatch)  
+local mask = torch.ones(img_w-2*self.hpatch, img_w-2*self.hpatch)*2  
 mask = torch.triu(torch.tril(mask,-1),-disp_max)
 mask = mask - 2;
 seqRefNegMask:add(nn.addMatrix(mask))
@@ -137,7 +137,7 @@ local seqPosNegMask = nn.Sequential()
 parRefPosPosNeg:add(seqRefPosMask)
 parRefPosPosNeg:add(seqPosNegMask)
 seqPosNegMask:add(nn.Transpose({1,2}))
-local mask = 2*torch.ones(img_w-2*self.hpatch, img_w-2*self.hpatch)  
+local mask = torch.ones(img_w-2*self.hpatch, img_w-2*self.hpatch)*2  
 mask = torch.triu(torch.tril(mask,-1),-disp_max)
 mask = mask - 2;
 seqPosNegMask:add(nn.addMatrix(mask))

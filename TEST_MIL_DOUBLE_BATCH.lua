@@ -18,9 +18,9 @@ math.randomseed(0);
 
 -- |parameteres|
 -- learning
-local test_set_size = 100;       -- 50000 
-local batch_size = 2             -- 512
-local epoch_size = batch_size*1    -- 100
+local test_set_size = 1000;       -- 50000 
+local batch_size = 512           -- 512
+local epoch_size = batch_size*2    -- 100
 local nb_epoch = 10000;            -- 10000
 -- loss
 local margin = 0.2;
@@ -30,7 +30,7 @@ kernel = 3;
 nbConvLayers = 5;
 -- debug
 local suffix = 'test_'
-local gpu_on = false;
+local gpu_on = true;
 local debug = true;
 
 if( gpu_on ) then
@@ -52,6 +52,10 @@ local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.
 
 local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
+
+print('Max disparity '.. disp_max.. '\n')
+print('Image width ' .. img_w ..'\n')
+
 
 -- |define network|
 _MODEL_ = mcCnnFst(nbConvLayers, nbFeatureMap, kernel)
@@ -229,7 +233,7 @@ for nepoch = 1, nb_epoch do
     logger:plot()
     
     -- save distance matrices
-    local refPos = _MODEL_.hook_refPos:clone();
+    refPos = _TR_NET_:get(2):get(1):get(2).output:clone();
     refPos = utils.softmax(refPos)
     refPos = utils.scale2_01(refPos)
     image.save('work/'..suffix..'dist_ref_pos.jpg',refPos)

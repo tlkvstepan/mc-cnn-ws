@@ -40,7 +40,7 @@ function sup3PatchSet:pair_col_row_2_id(pair, col, row)
   col = col - 1;
   row = row - 1;
   pair = pair - 1;
-  local id = ( (pair * self.img_h + row) * self.img_w + col )
+  local id = ( (row + pair * self.img_h) * self.img_w + col )
   local id = id + 1;
   
   return id

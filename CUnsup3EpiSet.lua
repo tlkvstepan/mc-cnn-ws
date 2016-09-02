@@ -47,7 +47,7 @@
     
     -- given pair(s)# and row(s)# function returns id(s)
     
-    local id = (pair-1)*self.img_h + (row - 1) + 1;
+    local id = row + self.img_h*(pair-1) ;
     return id;
   
   end
