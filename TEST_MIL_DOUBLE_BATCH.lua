@@ -30,7 +30,7 @@ kernel = 3;
 nbConvLayers = 5;
 -- debug
 local suffix = 'test_'
-local gpu_on = true;
+local gpu_on = false;
 local debug = true;
 
 if( gpu_on ) then

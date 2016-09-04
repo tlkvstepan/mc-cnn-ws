@@ -299,58 +299,9 @@ function mcCnnFst:getMilNet(img_w)
 end
 
 
-function mcCnnFst:getBagNet(nb_pairs)
-    
-    -- input table with 2 tensors : 
-    -- 1 x p_h x p_w - reference patch
-    -- 1 x p_h x (epi_w+2*p_w) - epipolar line
-    -- where p_h, p_w are hight and width of reference patch 
-    -- and epi_w length of epipolar line                                 
-        
-    local Net = nn.Sequential();
-    local parTab = nn.ParallelTable();
-    Net:add(parTab)
-        
-    -- epipolar line we pass through same feature net and get 64 x 1 x epi_w
-    local epiNet = model:getFeatureNet();
-    parTab:add(epiNet);
-    
-    -- reference patch we pass through feature net and get 64 x 1 x 1 response
-    local patchNet = epiNet:clone('weight','bias', 'gradWeight','gradBias');
-    parTab:add(patchNet);
-            
-    -- squeeze 
-    local module = nn.Squeeze()
-    patchNet:add(module)
-    module = nn.Unsqueeze(1)
-    patchNet:add(module)
-    local module = nn.Squeeze()
-    epiNet:add(module)
-    
-    -- transpose 
-    local module = nn.Transpose({1,2})
-    epiNet:add(module)
-    
-    -- normalize
-    local module = nn.Normalize(2)
-    epiNet:add(module)
-    local module = nn.Normalize(2)
-    patchNet:add(module)
-    
-    -- multiply
-    local module = nn.MM(false, true)
-    Net:add(module)
-    
-    -- max
-    local module = nn.Max(1)
-    Net:add(module)
-    
-    return Net;
-end
-
 -- This function creates basic feature net
 -- input of the nextwork is 1 x height x width  tensor
-function mcCnnFst:getFeatureNet()
+function mcCnnFst:getFeatureNet(pad_on)
     
   local fNet = nn.Sequential();
   
@@ -369,8 +320,16 @@ function mcCnnFst:getFeatureNet()
     local kH = self.kernel;
     local dW = 1;                 -- step of convolution 
     local dH = 1;
-
-    local module = nn.SpatialConvolution(nInputPlane, nOutputPlane, kW, kH, dW, dH);
+    
+    if pad_on == nil then
+      padW = 0;
+      padH = 0;
+    else
+      padW = (kW-1)/2;
+      padH = (kH-1)/2;
+    end
+      
+    local module = nn.SpatialConvolution(nInputPlane, nOutputPlane, kW, kH, dW, dH, padW, padH);
     fNet:add(module);
 
     -- Make ReLU (rectified linear unit)
