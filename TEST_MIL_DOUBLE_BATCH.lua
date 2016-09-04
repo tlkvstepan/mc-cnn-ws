@@ -8,8 +8,9 @@ torch.setdefaulttensortype('torch.FloatTensor')
 dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
 dofile('CSup3PatchSet.lua');
-dofile('CMcCnnFst.lua');
+mcCnnFst = dofile('CMcCnnFst.lua');
 dofile('CAddMatrix.lua')
+milWrapper = dofile('CMilWrapper.lua')
 
 utils = dofile('utils.lua');
 
@@ -30,8 +31,9 @@ kernel = 3;
 nbConvLayers = 5;
 -- debug
 local suffix = 'test_'
-local gpu_on = false;
+local gpu_on = true;
 local debug = true;
+local test_on = true
 
 if( gpu_on ) then
   require 'cunn'
@@ -52,20 +54,16 @@ local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.
 local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
---print('Max disparity '.. disp_max.. '\n')
---print('Image width ' .. img_w ..'\n')
-
-
 -- |define network|
-_MODEL_ = mcCnnFst(nbConvLayers, nbFeatureMap, kernel)
-local hpatch = _MODEL_.hpatch;
-_TR_NET_ = _MODEL_:getMilNetDoubleBatch(img_w, disp_max) 
-_TE_NET_ = _MODEL_:getTripletNet() 
+local base_fnet, hpatch = mcCnnFst.get(nbConvLayers, nbFeatureMap, kernel)
+_TR_NET_ = milWrapper.getMilNetDoubleBatch(img_w, disp_max, hpatch, base_fnet) 
+_TE_NET_ = milWrapper.getTripletNet(base_fnet) 
 
 if gpu_on then
   _TR_NET_:cuda()
   _TE_NET_:cuda()
 end
+
 _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 _TE_PPARAM_, _TE_PGRAD_ = _TE_NET_:getParameters()
 _TR_PPARAM_:copy(param0);
@@ -185,30 +183,39 @@ for nepoch = 1, nb_epoch do
 
   nsample = 0;
   sample_err = {}
+  local train_err = 0
+   
+ 
+   for k, input  in trainSet:sampleiter(batch_size, epoch_size) do
 
-  for k, input  in trainSet:sampleiter(batch_size, epoch_size) do
-
-    _TR_INPUT_ = input
-    _TR_TARGET_ =  torch.ones(batch_size, 2*(img_w - disp_max - 2*hpatch));  
+   _TR_INPUT_ = input
+   _TR_TARGET_ =  torch.ones(batch_size, 2*(img_w - disp_max - 2*hpatch));  
 
 
-    -- if gpu avaliable put batch on gpu
-    if gpu_on then
-      _TR_INPUT_[1] = _TR_INPUT_[1]:cuda()
-      _TR_INPUT_[2] = _TR_INPUT_[2]:cuda()
-      _TR_INPUT_[3] = _TR_INPUT_[3]:cuda()
-      _TR_TARGET_ = _TR_TARGET_:cuda()
-    end
+   -- if gpu avaliable put batch on gpu
+   if gpu_on then
+     _TR_INPUT_[1] = _TR_INPUT_[1]:cuda()
+     _TR_INPUT_[2] = _TR_INPUT_[2]:cuda()
+     _TR_INPUT_[3] = _TR_INPUT_[3]:cuda()
+     _TR_TARGET_ = _TR_TARGET_:cuda()
+   end
+    
+   -- if test mode, dont do training 
+   if not test_on then
+     optim.adam(feval, _TR_PPARAM_, {})    
+   else 
+     feval(_TR_PPARAM_)
+   end
 
-    optim.adam(feval, _TR_PPARAM_, {})    
-    table.insert(sample_err, _TR_ERR_)
+   table.insert(sample_err, _TR_ERR_)
 
-  end
+ end
+ train_err = torch.Tensor(sample_err):mean();
+
 
   -- validation
   local test_acc, test_acc_le2, test_acc_le5, err_index, disp_diff  = ftest()
-  local train_err = torch.Tensor(sample_err):mean();
-
+  
   local end_time = os.time()
   local time_diff = os.difftime(end_time,start_time);
 
