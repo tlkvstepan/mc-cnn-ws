@@ -73,8 +73,6 @@ function utils.vis_errors(p1, p2, p3, err_idx, text)
   -- ref, pos, neg are tensors nb_patches x h x w that we want to visualize 
   -- txt it table text we put on each patch row
  
-  print(err_idx)
- 
   local h = p1:size(2)
   local w = p1:size(3)
   local nb_patch = err_idx:size(1)
@@ -117,5 +115,36 @@ function utils.vis_errors(p1, p2, p3, err_idx, text)
     
   return im;
 end
+
+function utils.printTable(par)
+  -- function prints table 
+  for key, val in pairs(par) do
+      if type(val) == 'number' then
+        str = string.format("%10s : %03.3f", key, val) 
+      elseif type(val) == 'boolean' then
+        str =  string.format("%10s : %s", key, tostring(val)) 
+      elseif type(val) == 'string' then
+        str =  string.format("%10s : %s", key, val) 
+      end
+      print(str)     
+  end
+end
+
+function utils.file_exists(fname)
+   local f=io.open(fname,"r")
+   if f~=nil then io.close(f) return true else return false end
+end
+
+function utils.get_window_size(net)
+   local ws = 1
+   for i = 1,#net.modules do
+      local module = net:get(i)
+      if torch.typename(module) == 'cudnn.SpatialConvolution' or torch.typename(module) == 'nn.SpatialConvolution' then
+         ws = ws + module.kW - 1
+      end
+   end
+   return ws
+end
+
 
 return utils
