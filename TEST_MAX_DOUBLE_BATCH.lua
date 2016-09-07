@@ -8,6 +8,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
 dofile('CSup3PatchSet.lua');
+dofile('CMaxM.lua')
 mcCnnFst = dofile('CMcCnnFst.lua');
 dofile('CAddMatrix.lua')
 milWrapper = dofile('CMilWrapper.lua')
@@ -19,9 +20,9 @@ math.randomseed(0);
 -- |parameteres|
 -- learning
 local prm = {}
-prm['test_set_size'] = 200000                             -- 200000 
+prm['test_set_size'] = 1000                             -- 200000 
 prm['train_batch_size'] = 1024                          -- 1024
-prm['train_epoch_size'] = prm['train_batch_size']*100   -- 100
+prm['train_epoch_size'] = prm['train_batch_size']       -- 100
 prm['train_nb_epoch'] = 300                             -- 300
 -- loss
 prm['loss_margin'] = 0.2
@@ -30,11 +31,12 @@ prm['net_nb_feature'] = 64
 prm['net_kernel'] = 3
 prm['net_nb_layers'] = 4
 -- debug
-prm['debug_fname'] = 'largeScale' 
+prm['debug_fname'] = 'maxTest' 
 paths.mkdir('work/'..prm['debug_fname']);
 prm['debug_gpu_on'] = true
 prm['debug_save_on'] = true
 prm['debug_only_test_on'] = false
+prm['debug_start_from_fname'] = ''
 
 print('MIL training started \n')
 print('Parameters of the procedure : \n')
@@ -54,19 +56,18 @@ local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
 -- |define test and training networks|
-fname ='work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7';
 local base_fnet
 local hpatch
-if utils.file_exists(fname) then
+if utils.file_exists(prm['debug_start_from_fname']) then
   print('Continue training. Please delete the network file if you wish to start from the beggining\n')
-  _BASE_FNET_= torch.load(fname, 'ascii')
+  _BASE_FNET_= torch.load(prm['debug_start_from_fname'], 'ascii')
   hpatch = ( utils.get_window_size(_BASE_FNET_)-1 )/ 2
 else
   print('Start training from the begining\n')
   _BASE_FNET_, hpatch = mcCnnFst.get(prm['net_nb_layers'], prm['net_nb_feature'], prm['net_kernel'])
 end
 
-_TR_NET_ = milWrapper.getMilNetDoubleBatch(img_w, disp_max, hpatch, _BASE_FNET_) 
+_TR_NET_ =  milWrapper.getMaxNetDoubleBatch(img_w, disp_max, hpatch, _BASE_FNET_)  
 _TE_NET_ = milWrapper.getTripletNet(_BASE_FNET_) 
 
 if prm['debug_gpu_on'] then
@@ -158,7 +159,7 @@ feval = function(x)
   _TR_ERR_ = 0;   
   for nsample = 1, batch_size do
 
-    local sample_input = {epiRef[{{nsample},{},{}}],epiPos[{{nsample},{},{}}], epiNeg[{{nsample},{},{}}]}
+    local sample_input = {epiRef[{{nsample},{},{}}],epiPos[{{nsample},{},{}}]}
     local sample_target = _TR_TARGET_[{{nsample},{}}]    
 
     -- forward pass
@@ -266,7 +267,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
     for nline = 1,#lines do
       input = trainSet:index(torch.Tensor{lines[nline]})
       _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
-      refPos = _TR_NET_:get(2):get(1):get(2).output:clone():float();
+      refPos = _TR_NET_:get(2).output:clone():float();
       refPos = utils.mask(refPos,disp_max)
       refPos = utils.softmax(refPos)
       refPos = utils.scale2_01(refPos)
