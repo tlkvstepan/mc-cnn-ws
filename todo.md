@@ -14,8 +14,9 @@
 7. Implement entropy cost  
 8. Test how both costs behave on their own.
 9. Try to combine them with MIL objective.
-   
-   
+10. Equiperformance curve   
+11. Use all training data for KITTI
+
 % ideas
 1. dynamic programming (self learning)
 2. learn smoothness cost and reiterate (self learning)

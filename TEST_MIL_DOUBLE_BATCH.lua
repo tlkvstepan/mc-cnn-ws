@@ -30,7 +30,8 @@ prm['net_nb_feature'] = 64
 prm['net_kernel'] = 3
 prm['net_nb_layers'] = 4
 -- debug
-prm['debug_fname'] = 'largeScale'
+prm['debug_fname'] = 'largeScale' 
+paths.mkdir('work/'..prm['debug_fname']);
 prm['debug_gpu_on'] = true
 prm['debug_save_on'] = true
 prm['debug_only_test_on'] = false
@@ -38,6 +39,7 @@ prm['debug_only_test_on'] = false
 print('MIL training started \n')
 print('Parameters of the procedure : \n')
 utils.printTable(prm)
+
 
 if( prm['debug_gpu_on'] ) then
   require 'cunn'
@@ -180,7 +182,7 @@ if prm['debug_save_on'] then
   torch.save('work/' .. prm['debug_fname'] .. '/params_' .. timestamp .. prm['debug_fname'] .. '.t7', prm, 'ascii');
   
   --save test set statistic
-  gnuplot.epsfigure('work/' .. prm['debug_fname'] .. '/testset_stat_' .. timestamp .. prm['debug_fname'] .. '.eps')
+  gnuplot.pngfigure('work/' .. prm['debug_fname'] .. '/testset_stat_' .. timestamp .. prm['debug_fname'] .. '.png')
   gnuplot.hist(_TE_INPUT_[4], disp_max)
   gnuplot.xlabel('Distance between positive and negative example')
   gnuplot.ylabel('Number of samples')
