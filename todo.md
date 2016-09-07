@@ -3,18 +3,18 @@
 *3. large scale learning (all KITTI)
 *4. visualize distance matrix: mask it, compute softmax
 *5. set up processing on cluster
-6. tune stereo paremeters for our descriptor
-7. compare against mc-cnn on stereo
+---
 
-8.
-    a.implement simple entropy cost. 
-    b.test that it works.
-    c.analyse difference between it and previous: distances from correct, error
-9.  
-    a.implement complex entropy cost
-    b.test that it works.
-    c.analyse difference between it and previous: distances from correct, error
-10.match number of layers in our and mc-cnn fst net and retrain
+1. Correct logging when continue training 
+2. During trainig save all history of debug info (net, distance, error cases)
+   (this will allow to make early stopping)
+3. Retarain net
+4. Tune stereo paremeters for our descriptor (1000 random samples)
+5. Compare against mc-cnn on stereo
+6. Implement cost that maximize difference between first and second maximums
+7. Implement entropy cost  
+8. Test how both costs behave on their own.
+9. Try to combine them with MIL objective.
    
    
 % ideas

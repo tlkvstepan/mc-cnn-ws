@@ -40,9 +40,10 @@ function utils.mask(im, disp_max)
   img_w = im_new:size(2)
   local mask = torch.ones(img_w, img_w)  
   mask = torch.triu(torch.tril(mask,-1),-disp_max)
+  m = im_new:mean()
   im_new:cmul(mask);
-  mask:mul(im_new:min())
-  mask:add(-im_new:min())
+  mask:mul(m)
+  mask:add(-m)
   im_new:add(-mask)
   
 return im_new

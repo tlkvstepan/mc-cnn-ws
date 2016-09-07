@@ -19,7 +19,7 @@ math.randomseed(0);
 -- |parameteres|
 -- learning
 local prm = {}
-prm['test_set_size'] = 1000                             -- 50000 
+prm['test_set_size'] = 1000                           -- 50000 
 prm['train_batch_size'] = 512                          -- 1024
 prm['train_epoch_size'] = prm['train_batch_size']   -- 100
 prm['train_nb_epoch'] = 300                             -- 300
@@ -200,7 +200,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
    for k, input  in trainSet:sampleiter(prm['train_batch_size'], prm['train_epoch_size']) do
 
    _TR_INPUT_ = input
-   _TR_TARGET_ =  torch.ones(prm['train_batch_size'], 2);  
+   _TR_TARGET_ =  torch.ones(prm['train_batch_size'], 1);  
 
 
    -- if gpu avaliable put batch on gpu

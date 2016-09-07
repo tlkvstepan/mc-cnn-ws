@@ -19,9 +19,9 @@ math.randomseed(0);
 -- |parameteres|
 -- learning
 local prm = {}
-prm['test_set_size'] = 1000                             -- 50000 
-prm['train_batch_size'] = 1024                          -- 1024
-prm['train_epoch_size'] = prm['train_batch_size']*100   -- 100
+prm['test_set_size'] = 100                            -- 50000 
+prm['train_batch_size'] = 1                             -- 1024
+prm['train_epoch_size'] = prm['train_batch_size']*1     -- 100
 prm['train_nb_epoch'] = 300                             -- 300
 -- loss
 prm['loss_margin'] = 0.2
@@ -30,10 +30,10 @@ prm['net_nb_feature'] = 64
 prm['net_kernel'] = 3
 prm['net_nb_layers'] = 4
 -- debug
-prm['debug_fname'] = 'milMcCnn_largeScale_'
+prm['debug_fname'] = 'largeScale'
 prm['debug_gpu_on'] = true
 prm['debug_save_on'] = true
-prm['debug_only_test_on'] = false
+prm['debug_only_test_on'] = true
 
 print('MIL training started \n')
 print('Parameters of the procedure : \n')
@@ -55,7 +55,7 @@ local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.
 local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
--- |define test and trainingv networks|
+-- |define test and training networks|
 fname = 'work/'..prm['debug_fname']..'fnet.t7';
 local base_fnet
 local hpatch
@@ -176,9 +176,15 @@ feval = function(x)
   return _TR_ERR_, _TR_PGRAD_      
 end
 
+-- |save parameters|
+if prm['debug_save_on'] then
+  local timestamp = os.date("%Y_%m_%d_%X_")
+  torch.save('work/' .. prm['debug_fname'] .. '/params_' .. timestamp .. prm['debug_fname'] .. '.t7', prm, 'ascii');
+end
+    
 -- |define logger|
 if prm['debug_save_on'] then
-  logger = optim.Logger('work/'..prm['debug_fname']..'learning.log')
+  logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
   logger:setNames{'Training loss', 
     'Overall test accuracy', 
     'Test accuracy 1-2 px',
@@ -224,7 +230,6 @@ for nepoch = 1, prm['train_nb_epoch'] do
  end
  train_err = torch.Tensor(sample_err):mean();
 
-
   -- validation
   local test_acc, test_acc_le2, test_acc_le5, err_index, disp_diff  = ftest()
   
@@ -233,19 +238,17 @@ for nepoch = 1, prm['train_nb_epoch'] do
 
   -- save prm['debug_save_on'] info
   if prm['debug_save_on'] then
-    
+    local timestamp = os.date("%Y_%m_%d_%X_")
+   
     -- save errorneous test samples
     local fail_img = utils.vis_errors(_TE_INPUT_[1]:float():clone(), 
       _TE_INPUT_[2]:float():clone(), 
       _TE_INPUT_[3]:float():clone(), err_index, disp_diff)
-    image.save('work/'..prm['debug_fname']..'failure.png',fail_img)
-
-    -- save parameters
-    torch.save('work/'..prm['debug_fname']..'params.t7', prm, 'ascii');
+    image.save('work/' .. prm['debug_fname'] .. '/error_cases_' .. timestamp .. prm['debug_fname'] .. '.png',fail_img)
     
     -- save net
     _BASE_PPARAM_:copy(_TR_PPARAM_)
-    torch.save('work/'..prm['debug_fname']..'fnet.t7', _BASE_FNET_, 'ascii');
+    torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_, 'ascii');
     
     -- save log
     logger:add{train_err, test_acc, test_acc_le2, test_acc_le5}
@@ -258,7 +261,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
     refPos = utils.mask(refPos,disp_max)
     refPos = utils.softmax(refPos)
     refPos = utils.scale2_01(refPos)
-    image.save('work/'..prm['debug_fname']..'dist_ref_pos.png',refPos)
+    image.save('work/' .. prm['debug_fname'] .. '/dist_' .. timestamp .. prm['debug_fname'] .. '.png',refPos)
     
   end
   
