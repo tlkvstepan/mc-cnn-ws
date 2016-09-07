@@ -19,10 +19,10 @@ math.randomseed(0);
 -- |parameteres|
 -- learning
 local prm = {}
-prm['test_set_size'] = 100                            -- 50000 
-prm['train_batch_size'] = 1                             -- 1024
-prm['train_epoch_size'] = prm['train_batch_size']*1     -- 100
-prm['train_nb_epoch'] = 300                             -- 300
+prm['test_set_size'] = 200000                             -- 200000 
+prm['train_batch_size'] = 1024                          -- 1024
+prm['train_epoch_size'] = prm['train_batch_size']*100   -- 100
+prm['train_nb_epoch'] = 200                             -- 300
 -- loss
 prm['loss_margin'] = 0.2
 -- network
@@ -33,7 +33,7 @@ prm['net_nb_layers'] = 4
 prm['debug_fname'] = 'largeScale'
 prm['debug_gpu_on'] = true
 prm['debug_save_on'] = true
-prm['debug_only_test_on'] = true
+prm['debug_only_test_on'] = false
 
 print('MIL training started \n')
 print('Parameters of the procedure : \n')
@@ -44,12 +44,8 @@ if( prm['debug_gpu_on'] ) then
 end
 
 -- |read data| from all KITTI
-local img1_arr = torch.cat({torch.squeeze(utils.fromfile('data/KITTI12/x0.bin')),
-    torch.squeeze(utils.fromfile('data/KITTI15/x0.bin'))},1);
-
-local img2_arr = torch.cat({torch.squeeze(utils.fromfile('data/KITTI12/x1.bin')),
-    torch.squeeze(utils.fromfile('data/KITTI15/x1.bin'))},1);
-
+local img1_arr = torch.squeeze(utils.fromfile('data/KITTI12/x0.bin'));
+local img2_arr = torch.squeeze(utils.fromfile('data/KITTI12/x1.bin'));
 local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.bin')));
 
 local disp_max = disp_arr:max()
@@ -176,10 +172,19 @@ feval = function(x)
   return _TR_ERR_, _TR_PGRAD_      
 end
 
--- |save parameters|
+-- |save debug info|
 if prm['debug_save_on'] then
+  
+  -- save train parameters
   local timestamp = os.date("%Y_%m_%d_%X_")
   torch.save('work/' .. prm['debug_fname'] .. '/params_' .. timestamp .. prm['debug_fname'] .. '.t7', prm, 'ascii');
+  
+  --save test set statistic
+  gnuplot.epsfigure('work/' .. prm['debug_fname'] .. '/testset_stat_' .. timestamp .. prm['debug_fname'] .. '.eps')
+  gnuplot.hist(_TE_INPUT_[4], disp_max)
+  gnuplot.xlabel('Distance between positive and negative example')
+  gnuplot.ylabel('Number of samples')
+  gnuplot.plotflush()
 end
     
 -- |define logger|
@@ -255,14 +260,16 @@ for nepoch = 1, prm['train_nb_epoch'] do
     logger:plot()
     
     -- save distance matrices
-    input = trainSet:index(torch.Tensor{290})
-    _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
-    refPos = _TR_NET_:get(2):get(1):get(2).output:clone():float();
-    refPos = utils.mask(refPos,disp_max)
-    refPos = utils.softmax(refPos)
-    refPos = utils.scale2_01(refPos)
-    image.save('work/' .. prm['debug_fname'] .. '/dist_' .. timestamp .. prm['debug_fname'] .. '.png',refPos)
-    
+    local lines = {290,433}
+    for nline = 1,#lines do
+      input = trainSet:index(torch.Tensor{lines[nline]})
+      _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
+      refPos = _TR_NET_:get(2):get(1):get(2).output:clone():float();
+      refPos = utils.mask(refPos,disp_max)
+      refPos = utils.softmax(refPos)
+      refPos = utils.scale2_01(refPos)
+      image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',refPos)
+    end
   end
   
   print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc))

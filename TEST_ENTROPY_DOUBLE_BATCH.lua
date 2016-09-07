@@ -251,14 +251,16 @@ for nepoch = 1, prm['train_nb_epoch'] do
     logger:plot()
     
     -- save distance matrices
-    input = trainSet:index(torch.Tensor{290})
-    _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
-    refPos = _TR_NET_:get(2).output:clone():float();
-    refPos = utils.mask(refPos,disp_max)
-    refPos = utils.softmax(refPos)
-    refPos = utils.scale2_01(refPos)
-    image.save('work/'..prm['debug_fname']..'dist_ref_pos.png',refPos)
-    
+    local lines = {290,433}
+    for nline = 1,2
+      input = trainSet:index(torch.Tensor{lines[nline]})
+      _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
+      refPos = _TR_NET_:get(2).output:clone():float();
+      refPos = utils.mask(refPos,disp_max)
+      refPos = utils.softmax(refPos)
+      refPos = utils.scale2_01(refPos)
+      image.save('work/'..prm['debug_fname']..'dist_ref_pos.png',refPos)
+    end
   end
   
   print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc))
