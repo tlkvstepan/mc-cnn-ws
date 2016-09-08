@@ -20,9 +20,9 @@ math.randomseed(0);
 -- |parameteres|
 -- learning
 local prm = {}
-prm['test_set_size'] = 1000                             -- 200000 
+prm['test_set_size'] = 200000                          -- 200000 
 prm['train_batch_size'] = 1024                          -- 1024
-prm['train_epoch_size'] = prm['train_batch_size']       -- 100
+prm['train_epoch_size'] = prm['train_batch_size']*100   -- 100
 prm['train_nb_epoch'] = 300                             -- 300
 -- loss
 prm['loss_margin'] = 0.2

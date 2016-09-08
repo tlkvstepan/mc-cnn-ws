@@ -10,12 +10,13 @@
    (this will allow to make early stopping)
 *3. Retrain net
 *4. Implement cost that maximize difference between first and second maximums
+5. Implement net that efficiently combine two cost computation
+6. Equi-performance curve   
 
-4. Tune stereo paremeters for our descriptor (1000 random samples)
+6. Tune stereo paremeters for our descriptor (1000 random samples)
 5. Compare against mc-cnn on stereo
 8. Test how both costs behave on their own.
 9. Try to combine them with MIL objective.
-10. Equiperformance curve   
 11. Use all training data for KITTI
 
 % ideas
