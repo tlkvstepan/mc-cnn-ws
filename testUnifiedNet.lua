@@ -1,4 +1,5 @@
 require 'nn'
+require 'cunn'
 mcCnnFst = dofile('CMcCnnFst.lua')
 dofile('CAddMatrix.lua')
 dofile('CMaxM.lua')
@@ -162,8 +163,10 @@ maxFwdCst = nn.MarginRankingCriterion(maxFwd_margin);
 maxBwdCst = nn.MarginRankingCriterion(maxBwd_margin);
 parCri = nn.ParallelCriterion(true):add(milFwdCst,milFwd_w):add(milBwdCst,milBwd_w):add(maxFwdCst,maxFwd_w):add(maxBwdCst,maxBwd_w)
 
-targ =  torch.ones(1, (img_w - disp_max - 2*hpatch))
-netIn = {torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w)};
+Net:cuda()
+parCri:cuda()
+targ =  torch.ones(1, (img_w - disp_max - 2*hpatch)):cuda()
+netIn = {torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda()};
 
 netOut = Net:forward(netIn);
 criOut = parCri:forward(netOut, targ)
