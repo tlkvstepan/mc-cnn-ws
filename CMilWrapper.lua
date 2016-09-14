@@ -1,6 +1,6 @@
 local milWrapper = {}
 
-function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, fnet)
+function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, nmax, fnet)
 
 
 local fNetRef = fnet:clone();
@@ -105,8 +105,8 @@ dNetPosRefMax:add(nn.Max(2))
 dNetRefPosMax:add(nn.Max(2))
 dNetRefNeg:add(nn.Max(2))
 dNetNegPos:add(nn.Max(2))
-dNetPosRefMaxM:add(nn.MaxM(2, max_order))
-dNetRefPosMaxM:add(nn.MaxM(2, max_order))
+dNetPosRefMaxM:add(nn.MaxM(2, nmax))
+dNetRefPosMaxM:add(nn.MaxM(2, nmax))
 
 
 -- flatten tables hierarchy
