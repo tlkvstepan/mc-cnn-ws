@@ -37,12 +37,27 @@ function sup3PatchSet:pair_col_row_2_id(pair, col, row)
   
   -- Function convert image pair number, x and y of patch center to patch id
   -- Patches are indexed in row-first order
+  
+  if type(pair) ~= 'number' then
+      pair = pair:double()
+  end
+  if type(col) ~= 'number' then
+    col = col:double()
+  end
+  if type(row) ~= 'number' then
+      row = row:double()
+  end 
+  
   col = col - 1;
   row = row - 1;
   pair = pair - 1;
   local id = ( (row + pair * self.img_h) * self.img_w + col )
   local id = id + 1;
   
+  if type(id) ~= 'number'then
+    id = id:double()
+  end 
+
   return id
 
 end
@@ -51,6 +66,11 @@ function sup3PatchSet:id_2_pair_col_row(id)
   
   -- Function convert patch's id to pair number, x and y
   -- Patches are indexed in row-first order
+    
+  
+  if type(id) ~= 'number' then
+    id = id:double()
+  end 
   
   id = id - 1;
   
@@ -60,6 +80,18 @@ function sup3PatchSet:id_2_pair_col_row(id)
   local y =  torch.floor(reminder / self.img_w);
   local x = reminder % self.img_w ;
   
+  if type(pair) ~=  'number' then
+    pair = pair:double()
+  end
+  if type(x) ~= 'number' then
+    x = x:double()
+  end
+
+  if type(y) ~= 'number' then
+    y = y:double()
+  end 
+
+
   return (pair + 1), (x + 1), (y + 1);
 
 end
@@ -105,26 +137,26 @@ function sup3PatchSet:get_valid_id()
     for npair = 1, self.nb_pairs do
           
       -- get disparity map
-      local disp = torch.squeeze(self.disp_arr[{{npair},{},{}}]);
+      local disp = torch.squeeze(self.disp_arr[{{npair},{},{}}]):double();
           
-      -- find poinrs where disp is not zero
+      -- find points where disp is not zero
       local mask = torch.squeeze(disp:ge(1));
       if mask then 
           
           -- find x and y of these points 
-            local cur_xx = xx[mask];
-            local cur_yy = yy[mask];
-            local cur_disp = disp[mask];
+            local cur_xx = xx[mask]:clone();
+            local cur_yy = yy[mask]:clone();
+            local cur_disp = disp[mask]:clone();
             
             -- find points where we can fit patch in img1
             local mask = cur_xx:gt(self.hpatch + 1) -- to ensure that there is at least one negative 
             local mask_ = cur_xx:le(self.img_w-self.hpatch)
             mask:cmul(mask_);
-            local mask_ = cur_yy:gt(self.hpatch)
+            local mask_ = cur_yy:ge(self.hpatch + 1)
             mask:cmul(mask_);
             local mask_ = cur_yy:le(self.img_h-self.hpatch)
             mask:cmul(mask_);
-            local mask_ = torch.add(cur_xx,-cur_disp):gt(self.hpatch)
+            local mask_ = torch.add(cur_xx,-cur_disp):ge(self.hpatch + 1)
             mask:cmul(mask_);
                         
             -- find x, y for these points
@@ -132,6 +164,12 @@ function sup3PatchSet:get_valid_id()
             local cur_yy = cur_yy[mask];
                         
             -- find ID
+--            print(cur_xx:max())
+--            print(cur_xx:min())
+--            print(cur_yy:max())
+--            print(cur_yy:min())
+--            print('\n')
+            
             local cur_ID = self:pair_col_row_2_id(npair, cur_xx, cur_yy);
             
             table.insert(id, cur_ID) 
@@ -176,9 +214,9 @@ function sup3PatchSet:index(indices, inputs, targets)
       id_pos[n] = self:pair_col_row_2_id(pair_ref, col_ref - gt_disp, row_ref); 
     end  
     
-    id_pos = torch.Tensor(id_pos)
-    id_neg = torch.Tensor(id_neg)
-    id_ref = torch.Tensor(id_ref)
+    id_pos = torch.IntTensor(id_pos)
+    id_neg = torch.IntTensor(id_neg)
+    id_ref = torch.IntTensor(id_ref)
     
     local ref_patch = self:get_patch(id_ref, self.img1_arr)
     local pos_patch = self:get_patch(id_pos, self.img2_arr)
