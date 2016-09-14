@@ -3,8 +3,6 @@ require 'gnuplot'
 require 'optim'
 require 'nn'
 
-torch.setdefaulttensortype('torch.FloatTensor')
-
 dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
 dofile('CSup3PatchSet.lua');
@@ -15,6 +13,7 @@ utils = dofile('utils.lua');
 
 -- set randomseed to insure repeatability
 math.randomseed(0); 
+torch.manualSeed(0)
 
 -- |parameteres|
 -- learning
@@ -30,12 +29,12 @@ prm['net_nb_feature'] = 64
 prm['net_kernel'] = 3
 prm['net_nb_layers'] = 4
 -- debug
-prm['debug_fname'] = 'largeScale' 
+prm['debug_fname'] = 'milLargeScale' 
 paths.mkdir('work/'..prm['debug_fname']);
 prm['debug_gpu_on'] = true
 prm['debug_save_on'] = true
 prm['debug_only_test_on'] = false
-prm['debug_start_from_fname'] = 'work/largeScale/largeScale-2016_09_07_14:59:23.t7'
+prm['debug_start_from_timestamp'] = ''
 
 print('MIL training started \n')
 print('Parameters of the procedure : \n')
@@ -57,13 +56,17 @@ local img_w = img1_arr:size(3);
 -- |define test and training networks|
 local base_fnet
 local hpatch
-if utils.file_exists(prm['debug_start_from_fname']) then
+local fnet_fname = 'work/' .. prm['debug_fname'] .. '/fnet_' .. prm['debug_start_from_timestamp'] .. '_' .. prm['debug_fname'] .. '.t7'
+local optim_fname = 'work/' .. prm['debug_fname'] .. '/optim_' .. prm['debug_start_from_timestamp'] .. '_'.. prm['debug_fname'] .. '.t7'
+if utils.file_exists(fnet_fname) and utils.file_exists(optim_fname) then
   print('Continue training. Please delete the network file if you wish to start from the beggining\n')
-  _BASE_FNET_= torch.load(prm['debug_start_from_fname'], 'ascii')
+  _BASE_FNET_= torch.load(fnet_fname, 'ascii')
   hpatch = ( utils.get_window_size(_BASE_FNET_)-1 )/ 2
+  _OPTIM_STATE_ =  torch.load(optim_fname, 'ascii')
 else
   print('Start training from the begining\n')
   _BASE_FNET_, hpatch = mcCnnFst.get(prm['net_nb_layers'], prm['net_nb_feature'], prm['net_kernel'])
+  _OPTIM_STATE_ = {}
 end
 
 _TR_NET_ = milWrapper.getMilNetDoubleBatch(img_w, disp_max, hpatch, _BASE_FNET_) 
@@ -72,6 +75,11 @@ _TE_NET_ = milWrapper.getTripletNet(_BASE_FNET_)
 if prm['debug_gpu_on'] then
   _TR_NET_:cuda()
   _TE_NET_:cuda()
+  if _OPTIM_STATE_.m then
+    _OPTIM_STATE_.m = _OPTIM_STATE_.m:cuda()
+    _OPTIM_STATE_.v = _OPTIM_STATE_.v:cuda()
+    _OPTIM_STATE_.denom = _OPTIM_STATE_.denom:cuda()
+  end
 end
 
 _BASE_PPARAM_ = _BASE_FNET_:getParameters() 
@@ -81,6 +89,7 @@ _TE_PPARAM_, _TE_PGRAD_ = _TE_NET_:getParameters()
 -- |define datasets|
 local trainSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
 local testSet = sup3PatchSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
+testSet:shuffle() -- so that we have patches from all images
 
 -- |prepare test set|
 _TE_INPUT_, target = testSet:index(torch.range(1, prm['test_set_size']))
@@ -227,7 +236,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
     
    -- if test mode, dont do training 
    if not prm['debug_only_test_on'] then
-     optim.adam(feval, _TR_PPARAM_, {})    
+     optim.adam(feval, _TR_PPARAM_, {}, _OPTIM_STATE_)    
    else 
      feval(_TR_PPARAM_)
    end
@@ -257,6 +266,14 @@ for nepoch = 1, prm['train_nb_epoch'] do
     _BASE_PPARAM_:copy(_TR_PPARAM_)
     torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_, 'ascii');
     
+    -- save optim state
+    local optim_state_host ={}
+    optim_state_host.t = _OPTIM_STATE_.t;
+    optim_state_host.m = _OPTIM_STATE_.m:clone():double();
+    optim_state_host.v = _OPTIM_STATE_.v:clone():double();
+    optim_state_host.denom = _OPTIM_STATE_.denom:clone():double();
+    torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
+        
     -- save log
     logger:add{train_err, test_acc, test_acc_le2, test_acc_le5}
     logger:plot()

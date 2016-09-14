@@ -18,6 +18,9 @@
 8. Test how both costs behave on their own.
 9. Try to combine them with MIL objective.
 11. Use all training data for KITTI
+12. Make validation and test set to tune parameters (such as early stopping)
+13. Set up experiment for Middlebury, Stretcha datasets
+14. Implement dynamic programming net
 
 % ideas
 1. dynamic programming (self learning)

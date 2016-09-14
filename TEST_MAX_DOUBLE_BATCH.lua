@@ -82,6 +82,7 @@ _TE_PPARAM_, _TE_PGRAD_ = _TE_NET_:getParameters()
 -- |define datasets|
 local trainSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
 local testSet = sup3PatchSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
+testSet:shuffle() -- so that we have patches from all images
 
 -- |prepare test set|
 _TE_INPUT_, target = testSet:index(torch.range(1, prm['test_set_size']))

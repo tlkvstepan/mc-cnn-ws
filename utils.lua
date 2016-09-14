@@ -36,7 +36,7 @@ end
 
 function utils.mask(im, disp_max)
   
-  im_new = im:clone()
+  im_new = im:clone():double()
   img_w = im_new:size(2)
   local mask = torch.ones(img_w, img_w)  
   mask = torch.triu(torch.tril(mask,-1),-disp_max)
@@ -50,7 +50,7 @@ return im_new
 end
 
 function utils.softmax(im)
-  im_new = im:clone()
+  im_new = im:clone():double()
   cols_max = im_new:max(2)
   im_new:add(-torch.repeatTensor(cols_max,1,im_new:size(2)))
   im_new:exp()
@@ -93,9 +93,9 @@ function utils.vis_errors(p1, p2, p3, err_idx, text)
       
       local cur_idx = err_idx[idx[nsample]] 
       local cur_txt = tostring(text[idx[nsample]])
-      local patch1 = (p1[{{cur_idx},{},{}}])
-      local patch2 = (p2[{{cur_idx},{},{}}])
-      local patch3 = (p3[{{cur_idx},{},{}}])
+      local patch1 = p1[{{cur_idx},{},{}}]:double()
+      local patch2 = p2[{{cur_idx},{},{}}]:double()
+      local patch3 = p3[{{cur_idx},{},{}}]:double()
       
       patch1:add(-patch1:min())
       patch1:div(patch1:max()-patch1:min())
