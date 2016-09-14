@@ -1,12 +1,10 @@
 local milWrapper = {}
 
-function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, nmax, fnet)
-
+function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, fnet)
 
 local fNetRef = fnet:clone();
  
 local Net = nn.Sequential()
-
 
 -- pass 3 epipolar lines through feature net and normalize outputs
 local fNets = nn.ParallelTable()
@@ -105,8 +103,8 @@ dNetPosRefMax:add(nn.Max(2))
 dNetRefPosMax:add(nn.Max(2))
 dNetRefNeg:add(nn.Max(2))
 dNetNegPos:add(nn.Max(2))
-dNetPosRefMaxM:add(nn.MaxM(2, nmax))
-dNetRefPosMaxM:add(nn.MaxM(2, nmax))
+dNetPosRefMaxM:add(nn.MaxM(2, max_order))
+dNetRefPosMaxM:add(nn.MaxM(2, max_order))
 
 
 -- flatten tables hierarchy
