@@ -20,9 +20,9 @@ torch.manualSeed(0)
 -- |parse input parameters|
 cmd = torch.CmdLine()
 -- learning
-cmd:option('-test_set_size', 1000)
-cmd:option('-train_batch_size', 124)
-cmd:option('-train_epoch_size', 1*124)
+cmd:option('-test_set_size', 200000)
+cmd:option('-train_batch_size', 1024)
+cmd:option('-train_epoch_size', 100*1024)
 cmd:option('-train_nb_epoch', 300)
 -- loss
 cmd:option('-loss_margin', 0.2)
