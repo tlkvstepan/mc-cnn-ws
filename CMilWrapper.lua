@@ -1,6 +1,6 @@
 local milWrapper = {}
 
-function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, fnet)
+function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, max_order, fnet)
 
 local fNetRef = fnet:clone();
  
@@ -310,7 +310,7 @@ return Net
 
 end
 
-function milWrapper.getMaxNetDoubleBatch(img_w, disp_max, hpatch, fnet)  
+function milWrapper.getMaxNetDoubleBatch(img_w, disp_max, hpatch, max_order, fnet)  
 
 local fNetRef = fnet:clone()
 local Net = nn.Sequential()
@@ -352,7 +352,7 @@ stream1par2:add(stream1seq1)
 stream1seq1:add(nn.Max(2))
 local stream1seq2 = nn.Sequential()
 stream1par2:add(stream1seq2)
-stream1seq2:add(nn.MaxM(2,3))
+stream1seq2:add(nn.MaxM(2,max_order))
 stream1seq1:add(nn.Unsqueeze(2))
 stream1seq2:add(nn.Unsqueeze(2))
 stream1:add(nn.JoinTable(2))
@@ -369,7 +369,7 @@ stream2par2:add(stream2seq1)
 stream2seq1:add(nn.Max(2))
 local stream2seq2 = nn.Sequential()
 stream2par2:add(stream2seq2)
-stream2seq2:add(nn.MaxM(2,3))
+stream2seq2:add(nn.MaxM(2,max_order))
 stream2seq1:add(nn.Unsqueeze(2))
 stream2seq2:add(nn.Unsqueeze(2))
 stream2:add(nn.JoinTable(2))

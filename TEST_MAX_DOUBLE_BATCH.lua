@@ -16,31 +16,32 @@ utils = dofile('utils.lua');
 math.randomseed(0); 
 torch.manualSeed(0)
 
--- |parameteres|
+-- |parse input parameters|
+cmd = torch.CmdLine()
 -- learning
-local prm = {}
-prm['test_set_size'] = 200000                           -- 200000 
-prm['train_batch_size'] = 1024                          -- 1024
-prm['train_epoch_size'] = prm['train_batch_size']*100   -- 100
-prm['train_nb_epoch'] = 300                             -- 300
+cmd:option('-test_set_size', 200000)
+cmd:option('-train_batch_size', 1024)
+cmd:option('-train_epoch_size', 100*1024)
+cmd:option('-train_nb_epoch', 300)
 -- loss
-prm['loss_margin'] = 0.2
+cmd:option('-loss_margin', 0.2)
+cmd:option('-max_order', 3)
 -- network
-prm['net_nb_feature'] = 64
-prm['net_kernel'] = 3
-prm['net_nb_layers'] = 4
+cmd:option('-net_nb_feature', 64)
+cmd:option('-net_kernel', 3)
+cmd:option('-net_nb_layers', 4)
 -- debug
-prm['debug_fname'] = 'maxLargeScale' 
-paths.mkdir('work/'..prm['debug_fname']);
-prm['debug_gpu_on'] = true
-prm['debug_save_on'] = true
-prm['debug_only_test_on'] = false
-prm['debug_start_from_timestamp'] = '2016_09_14_14:55:30'
+cmd:option('-debug_fname', 'test')
+cmd:option('-debug_gpu_on', true)
+cmd:option('-debug_save_on', true)
+cmd:option('-debug_only_test_on', false)
+cmd:option('-debug_start_from_timestamp', '')
+prm = cmd:parse(arg)
+paths.mkdir('work/'..prm['debug_fname']); -- make output folder
 
 print('MIL training started \n')
 print('Parameters of the procedure : \n')
 utils.printTable(prm)
-
 
 if( prm['debug_gpu_on'] ) then
   require 'cunn'
@@ -70,7 +71,7 @@ else
   _OPTIM_STATE_ = {}
 end
 
-_TR_NET_ =  milWrapper.getMaxNetDoubleBatch(img_w, disp_max, hpatch, _BASE_FNET_)  
+_TR_NET_ =  milWrapper.getMaxNetDoubleBatch(img_w, disp_max, hpatch, prm['max_order'], _BASE_FNET_)  
 _TE_NET_ = milWrapper.getTripletNet(_BASE_FNET_) 
 
 if prm['debug_gpu_on'] then
