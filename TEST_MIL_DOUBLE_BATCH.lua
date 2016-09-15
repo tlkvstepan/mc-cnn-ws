@@ -29,11 +29,11 @@ cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
 -- debug
-cmd:option('-debug_fname', 'test')
+cmd:option('-debug_fname', 'milLargeScale')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_only_test_on', false)
-cmd:option('-debug_start_from_timestamp', '')
+cmd:option('-debug_start_from_timestamp', '2016_09_15_16:11:01')
 prm = cmd:parse(arg)
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
 

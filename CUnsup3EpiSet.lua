@@ -11,7 +11,6 @@
  
 ]]--
 
- --dofile('DataLoader.lua');
   local unsup3EpiSet = torch.class('unsup3EpiSet', 'DataLoader')
 
   function unsup3EpiSet:__init( img1_arr, img2_arr, hpatch, disp_max)
@@ -63,6 +62,7 @@
     
     local epi = torch.Tensor(id:numel(), 2*self.hpatch+1, self.img_w)
     for n = 1,id:numel() do
+      -- we keep data in float, but when queried convert to double f
       epi[{{n},{},{}}] = img[{{pair[n]},{row_min[n],row_max[n]},{}}]:double();
     end
     return epi;

@@ -25,7 +25,8 @@
 13. Use all training data for KITTI
 14. Make validation and test set to tune parameters (such as early stopping)
 15. Set up experiment for Middlebury, Stretcha datasets
-
+16. Modify optim logger
+17. Use cmd parameter logger
 % ideas
 0. oversharpening of maximum. since ground truth is not precise some positives might be cosidered as negatives
    maybe our algorithm does better than ground truth?
