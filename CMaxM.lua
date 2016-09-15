@@ -1,8 +1,10 @@
 local MaxM, parent = torch.class('nn.MaxM', 'nn.Module')
 
-function MaxM:__init(dimension,n, nInputDims)
+function MaxM:__init(dimension, n, r, nInputDims)
    parent.__init(self)
    self.n = n
+   if r == nil then r = 0 end
+   self.r = r
    dimension = dimension or 1
    self.dimension = dimension
    -- do not assign default value to nInputDims or it will break backward compatibility
@@ -28,12 +30,17 @@ end
 function MaxM:updateOutput(input)
    self:_lazyInit()
    local dimension = self:_getPositiveDimension(input)
-   --torch.MaxM(self._output, self._indices, input, dimension)
-   
+  
    local _input  = input:clone()
    for i = 1, self.n do
-        torch.max(self._output, self._indices, _input, dimension)
-       _input = _input:scatter(dimension, self._indices, -1/0)
+      torch.max(self._output, self._indices, _input, dimension)
+      _input = _input:scatter(dimension, self._indices, -1/0)
+      for j = -self.r,self.r do
+          local ind =  self._indices + j;
+          ind[ind:lt(1)] = 1;
+          ind[ind:gt(input:size(2))] = input:size(2);
+          _input = _input:scatter(dimension, ind, -1/0)
+      end
    end
       
    if input:dim() > 1 then
