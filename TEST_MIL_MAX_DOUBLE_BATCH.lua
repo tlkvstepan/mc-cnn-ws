@@ -20,13 +20,14 @@ torch.manualSeed(0)
 -- |parse input parameters|
 cmd = torch.CmdLine()
 -- learning
-cmd:option('-test_set_size', 200000)      -- 200000
-cmd:option('-train_batch_size', 1024)     -- 1024
-cmd:option('-train_epoch_size', 100*1024) -- 100*1024
+cmd:option('-test_set_size', 1000)
+cmd:option('-train_batch_size', 124)
+cmd:option('-train_epoch_size', 1*124)
 cmd:option('-train_nb_epoch', 300)
 -- loss
 cmd:option('-loss_margin', 0.2)
-cmd:option('-max_order', 3)
+cmd:option('-max_order', 2)
+cmd:option('-max_r', 2)
 -- network
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
@@ -74,7 +75,7 @@ else
   _OPTIM_STATE_ = {}
 end
 
-_TR_NET_ = milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, prm['max_order'], _BASE_FNET_)
+_TR_NET_ = milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, prm['max_order'], prm['max_r'], _BASE_FNET_)
 _TE_NET_ = milWrapper.getTripletNet(_BASE_FNET_) 
 
 if prm['debug_gpu_on'] then
