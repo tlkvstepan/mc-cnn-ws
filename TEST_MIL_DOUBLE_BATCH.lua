@@ -19,7 +19,7 @@ torch.manualSeed(0)
 -- |parse input parameters|
 cmd = torch.CmdLine()
 -- learning
-cmd:option('-test_set_size', 200000)      -- 200000
+cmd:option('-test_set_size', 50000)      -- 200000
 cmd:option('-train_batch_size', 1024)     -- 1024
 cmd:option('-train_epoch_size', 100*1024) -- 100*1024
 cmd:option('-train_nb_epoch', 300)
@@ -34,7 +34,7 @@ cmd:option('-debug_fname', 'milLargeScale')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_only_test_on', false)
-cmd:option('-debug_start_from_timestamp', '2016_09_15_16:11:01')
+cmd:option('-debug_start_from_timestamp', '2016_09_16_10:05:58')
 prm = cmd:parse(arg)
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
 

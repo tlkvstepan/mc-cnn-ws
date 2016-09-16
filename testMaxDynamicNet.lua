@@ -2,6 +2,7 @@ require 'nn'
 mcCnnFst = dofile('CMcCnnFst.lua')
 dofile('CAddMatrix.lua')
 dofile('CMaxM.lua')
+dofile('CDynamicProgramming.lua')
 
 disp_max = 10
 img_w = 30
