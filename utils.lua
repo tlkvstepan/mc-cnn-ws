@@ -69,14 +69,14 @@ return im_scale
 
 end
   
-function utils.vis_errors(p1, p2, p3, err_idx, text)
+function utils.vis_errors(p1, p2, p3, text)
   
   -- ref, pos, neg are tensors nb_patches x h x w that we want to visualize 
   -- txt it table text we put on each patch row
  
   local h = p1:size(2)
   local w = p1:size(3)
-  local nb_patch = err_idx:size(1)
+  local nb_patch = p1:size(1)
   
   local max_nb_patch = 30
    
@@ -91,7 +91,7 @@ function utils.vis_errors(p1, p2, p3, err_idx, text)
   
   for nsample = 1,nb_patch do
       
-      local cur_idx = err_idx[idx[nsample]] 
+      local cur_idx = idx[nsample] 
       local cur_txt = tostring(text[idx[nsample]])
       local patch1 = p1[{{cur_idx},{},{}}]:double()
       local patch2 = p2[{{cur_idx},{},{}}]:double()

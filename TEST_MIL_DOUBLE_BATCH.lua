@@ -5,8 +5,9 @@ require 'nn'
 
 dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
-dofile('CSup3PatchSet.lua');
+dofile('CSup1Patch1EpiSet.lua');
 mcCnnFst = dofile('CMcCnnFst.lua');
+testFun = dofile('CTestFun.lua');
 dofile('CAddMatrix.lua')
 milWrapper = dofile('CMilWrapper.lua')
 utils = dofile('utils.lua');
@@ -70,11 +71,10 @@ else
 end
 
 _TR_NET_ = milWrapper.getMilNetDoubleBatch(img_w, disp_max, hpatch, _BASE_FNET_) 
-_TE_NET_ = milWrapper.getTripletNet(_BASE_FNET_) 
 
 if prm['debug_gpu_on'] then
   _TR_NET_:cuda()
-  _TE_NET_:cuda()
+  _BASE_FNET_:cuda()
   if _OPTIM_STATE_.m then
     _OPTIM_STATE_.m = _OPTIM_STATE_.m:cuda()
     _OPTIM_STATE_.v = _OPTIM_STATE_.v:cuda()
@@ -84,21 +84,18 @@ end
 
 _BASE_PPARAM_ = _BASE_FNET_:getParameters() 
 _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
-_TE_PPARAM_, _TE_PGRAD_ = _TE_NET_:getParameters()
 
 -- |define datasets|
 local trainSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
-local testSet = sup3PatchSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
+local testSet = sup1Patch1EpiSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
 testSet:shuffle() -- so that we have patches from all images
 
 -- |prepare test set|
-_TE_INPUT_, target = testSet:index(torch.range(1, prm['test_set_size']))
-_TE_TARGET_ = torch.ones(prm['test_set_size'])
+_TE_INPUT_, _TE_TARGET_ = testSet:index(torch.range(1, prm['test_set_size']))
 if prm['debug_gpu_on'] then
   _TE_TARGET_ = _TE_TARGET_:cuda()
   _TE_INPUT_[1] = _TE_INPUT_[1]:cuda();
   _TE_INPUT_[2] = _TE_INPUT_[2]:cuda();
-  _TE_INPUT_[3] = _TE_INPUT_[3]:cuda();
 end
 
 -- |define criterion|
@@ -108,49 +105,6 @@ if prm['debug_gpu_on'] then
   _CRITERION_:cuda()
 end
 
--- |define  test function|
-ftest = function()
-
-  -- function returns test accuracy and mask of errors
-
-  _TE_PPARAM_:copy(_TR_PPARAM_)
-
-  local nb_samples = _TE_INPUT_[1]:size(1);
-  local patchRef, patchPos, patchNeg, dispDiff = unpack(_TE_INPUT_) 
-
-  local err_mask = {};
-  for nsample = 1, nb_samples do
-
-    local sample_input = {{patchPos[{{nsample},{},{}}], patchNeg[{{nsample},{},{}}]}, patchRef[{{nsample},{},{}}]}
-
-    -- forward pass
-    local out = _TE_NET_:forward(sample_input)
-    local pos_cos = torch.squeeze(out[1]:double())
-    local neg_cos = torch.squeeze(out[2]:double())
-
-    if pos_cos <= neg_cos then
-      err_mask[nsample] = 1;
-    else
-      err_mask[nsample] = 0;  
-    end
-
-  end
-
-  local err_mask = torch.Tensor(err_mask)
-
-  local acc = err_mask[err_mask:eq(0)]:numel() * 100 / nb_samples
-
-  local mask_le2 = dispDiff:le(2)
-  local acc_le2 = err_mask[torch.cmul(mask_le2,err_mask:eq(0))]:numel() * 100 / err_mask[mask_le2]:numel(); 
-
-  local mask_le5 = dispDiff:le(5);
-  local acc_le5 = err_mask[torch.cmul(mask_le5,err_mask:eq(0))]:numel() * 100 / err_mask[mask_le5]:numel(); 
-
-  local err_index = torch.range(1,nb_samples);
-  local err_index = err_index[err_mask:eq(1)]
-
-  return acc, acc_le2, acc_le5, err_index, dispDiff[err_mask:eq(1)]    
-end
 
 -- |define optimization function|
 feval = function(x)
@@ -190,12 +144,6 @@ if prm['debug_save_on'] then
   local timestamp = os.date("%Y_%m_%d_%X_")
   torch.save('work/' .. prm['debug_fname'] .. '/params_' .. timestamp .. prm['debug_fname'] .. '.t7', prm, 'ascii');
   
-  --save test set statistic
-  gnuplot.epsfigure('work/' .. prm['debug_fname'] .. '/testset_stat_' .. timestamp .. prm['debug_fname'] .. '.eps')
-  gnuplot.hist(_TE_INPUT_[4], disp_max)
-  gnuplot.xlabel('Distance between positive and negative example')
-  gnuplot.ylabel('Number of samples')
-  gnuplot.plotflush()
 end
     
 -- |define logger|
@@ -247,7 +195,8 @@ for nepoch = 1, prm['train_nb_epoch'] do
  train_err = torch.Tensor(sample_err):mean();
 
   -- validation
-  local test_acc, test_acc_le2, test_acc_le5, err_index, disp_diff  = ftest()
+  _BASE_PPARAM_:copy(_TR_PPARAM_)
+  local test_acc_lt3, test_acc_lt5, errCases = testFun.epiEval(_BASE_FNET_, _TE_INPUT_, _TE_TARGET_)
   
   local end_time = os.time()
   local time_diff = os.difftime(end_time,start_time);
@@ -257,14 +206,11 @@ for nepoch = 1, prm['train_nb_epoch'] do
     local timestamp = os.date("%Y_%m_%d_%X_")
    
     -- save errorneous test samples
-    local fail_img = utils.vis_errors(_TE_INPUT_[1]:float():clone(), 
-      _TE_INPUT_[2]:float():clone(), 
-      _TE_INPUT_[3]:float():clone(), err_index, disp_diff)
+    local fail_img = utils.vis_errors(errCases[1], errCases[2], errCases[3], errCases[4])
     image.save('work/' .. prm['debug_fname'] .. '/error_cases_' .. timestamp .. prm['debug_fname'] .. '.png',fail_img)
     
     -- save net
-    _BASE_PPARAM_:copy(_TR_PPARAM_)
-    torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_, 'ascii');
+    torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_:clone():double(), 'ascii');
     
     -- save optim state
     local optim_state_host ={}
@@ -275,7 +221,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
     torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
         
     -- save log
-    logger:add{train_err, test_acc, test_acc_le2, test_acc_le5}
+    logger:add{train_err, test_acc_lt3, test_acc_lt5}
     logger:plot()
     
     -- save distance matrices
@@ -291,7 +237,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
     end
   end
   
-  print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc))
+  print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc_lt3))
   collectgarbage()
 
 end
