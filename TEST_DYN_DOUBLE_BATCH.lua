@@ -3,9 +3,9 @@ require 'gnuplot'
 require 'optim'
 require 'nn'
 
-dofile('CContrastMax2ndMax.lua');
 dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
+dofile('CContrastDynProgMax.lua');
 dofile('CSup1Patch1EpiSet.lua');
 mcCnnFst = dofile('CMcCnnFst.lua');
 testFun = dofile('CTestFun.lua');
@@ -21,9 +21,9 @@ torch.manualSeed(0)
 -- |parse input parameters|
 cmd = torch.CmdLine()
 -- learning
-cmd:option('-test_set_size', 50000)      -- 200000
-cmd:option('-train_batch_size', 1024)     -- 1024
-cmd:option('-train_epoch_size', 100*1024) -- 100*1024
+cmd:option('-test_set_size', 100)      -- 200000
+cmd:option('-train_batch_size', 1)     -- 1024
+cmd:option('-train_epoch_size', 1) -- 100*1024
 cmd:option('-train_nb_epoch', 300)
 -- loss
 cmd:option('-loss_margin', 0.2)
@@ -33,19 +33,17 @@ cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
 -- debug
-cmd:option('-debug_fname', 'milMaxLargeScale_maxsup')
+cmd:option('-debug_fname', 'test_milDynLargeScale')
 cmd:option('-debug_gpu_on', false)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_only_test_on', false)
-cmd:option('-debug_start_from_timestamp', '2016_09_16_22:50:44')
+cmd:option('-debug_start_from_timestamp', '2016_09_16_21:21:26')
 prm = cmd:parse(arg)
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
-
 
 print('MIL training started \n')
 print('Parameters of the procedure : \n')
 utils.printTable(prm)
-
 
 if( prm['debug_gpu_on'] ) then
   require 'cunn'
@@ -75,7 +73,7 @@ else
   _OPTIM_STATE_ = {}
 end
 
-_TR_NET_ = milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, prm['dist_min'], _BASE_FNET_)
+_TR_NET_ =  milWrapper.getDynProgNetDoubleBatch(img_w, disp_max, hpatch, prm['dist_min'], _BASE_FNET_)  
 
 if prm['debug_gpu_on'] then
   _TR_NET_:cuda()
@@ -105,11 +103,7 @@ end
 
 -- |define criterion|
 -- loss(x(+), x(-)) = max(0,  - x(+) + x(-)  + prm['loss_margin'])
-local milFwdCst = nn.MarginRankingCriterion(prm['loss_margin']);
-local milBwdCst = nn.MarginRankingCriterion(prm['loss_margin']);
-local maxFwdCst = nn.MarginRankingCriterion(prm['loss_margin']);
-local maxBwdCst = nn.MarginRankingCriterion(prm['loss_margin']);
-_CRITERION_ = nn.ParallelCriterion(true):add(milFwdCst,0.25):add(milBwdCst,0.25):add(maxFwdCst,0.25):add(maxBwdCst,0.25)
+_CRITERION_ = nn.MarginRankingCriterion(prm['loss_margin']);
 if prm['debug_gpu_on'] then
   _CRITERION_:cuda()
 end
@@ -129,18 +123,19 @@ feval = function(x)
   _TR_ERR_ = 0;   
   for nsample = 1, batch_size do
 
-    local sample_input = {epiRef[{{nsample},{},{}}],epiPos[{{nsample},{},{}}], epiNeg[{{nsample},{},{}}]}
+    local sample_input = {epiRef[{{nsample},{},{}}], epiPos[{{nsample},{},{}}]}
     local sample_target = _TR_TARGET_[{{nsample},{}}]    
 
     -- forward pass
-    _TR_ERR_ = _TR_ERR_ + _CRITERION_:forward(_TR_NET_:forward(sample_input), sample_target)
+    _TR_NET_:forward(sample_input)
+    _TR_ERR_ = _TR_ERR_ + _CRITERION_:forward(_TR_NET_.output, sample_target)
 
     -- backword pass
     _TR_NET_:backward(sample_input, _CRITERION_:backward(_TR_NET_.output, sample_target))
 
   end
-  _TR_ERR_ = _TR_ERR_ / prm['train_batch_size']
-  _TR_PGRAD_:div(prm['train_batch_size']);
+  _TR_ERR_ = _TR_ERR_ / prm['train_batch_size'] / 2
+  _TR_PGRAD_:div(2*prm['train_batch_size']);
 
   return _TR_ERR_, _TR_PGRAD_      
 end
@@ -179,7 +174,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
    for k, input  in trainSet:sampleiter(prm['train_batch_size'], prm['train_epoch_size']) do
 
    _TR_INPUT_ = input
-   _TR_TARGET_ =  torch.ones(prm['train_batch_size'], (img_w - disp_max - 2*hpatch));  
+   _TR_TARGET_ =  torch.ones(prm['train_batch_size'], 2*(img_w - disp_max - 2*hpatch));  
 
    -- if gpu avaliable put batch on gpu
    if prm['debug_gpu_on'] then
@@ -240,7 +235,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
       else
         _TR_NET_:forward({input[1],input[2],input[3]} )
       end
-      refPos = _TR_NET_:get(2):get(1):get(2).output:clone():float();
+      refPos = _TR_NET_:get(2).output:clone():float();
       refPos = utils.mask(refPos,disp_max)
       refPos = utils.softmax(refPos)
       refPos = utils.scale2_01(refPos)

@@ -11,9 +11,11 @@
 *3. Retrain net
 *4. Implement cost that maximize difference between first and second maximums
 *5. Implement net that efficiently combine two cost computation
+*6. Implement alternative testing and get results for learned net (several error thresholds)
 
-6. Implement alternative testing and get results for learned net (several error thresholds)
-7. Implement net with dynamic programing
+7. Implement and test contrastive net with dynamic programing only
+8. Implement contrastive net with mil
+
 
 
 

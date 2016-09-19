@@ -7,6 +7,7 @@ dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
 dofile('CSup1Patch1EpiSet.lua');
 mcCnnFst = dofile('CMcCnnFst.lua');
+dofile('CContrastMax2ndMax.lua');
 testFun = dofile('CTestFun.lua');
 dofile('CAddMatrix.lua')
 dofile('CMaxM.lua')
@@ -20,7 +21,7 @@ torch.manualSeed(0)
 -- |parse input parameters|
 cmd = torch.CmdLine()
 -- learning
-cmd:option('-test_set_size', 200000)      -- 200000
+cmd:option('-test_set_size', 50000)      -- 200000
 cmd:option('-train_batch_size', 1024)     -- 1024
 cmd:option('-train_epoch_size', 100*1024) -- 100*1024
 cmd:option('-train_nb_epoch', 300)
@@ -32,7 +33,7 @@ cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
 -- debug
-cmd:option('-debug_fname', 'milMaxLargeScale_maxsup')
+cmd:option('-debug_fname', 'maxLargeScale_maxsup')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_only_test_on', false)
@@ -228,7 +229,11 @@ for nepoch = 1, prm['train_nb_epoch'] do
     local lines = {290,433}
     for nline = 1,#lines do
       input = trainSet:index(torch.Tensor{lines[nline]})
-      _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
+      if  prm['debug_gpu_on'] then
+        _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
+      else
+        _TR_NET_:forward({input[1],input[2],input[3]} )
+      end
       refPos = _TR_NET_:get(2).output:clone():float();
       refPos = utils.mask(refPos,disp_max)
       refPos = utils.softmax(refPos)
