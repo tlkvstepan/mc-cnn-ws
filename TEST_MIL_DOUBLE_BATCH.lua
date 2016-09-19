@@ -228,7 +228,11 @@ for nepoch = 1, prm['train_nb_epoch'] do
     local lines = {290,433}
     for nline = 1,#lines do
       input = trainSet:index(torch.Tensor{lines[nline]})
-      _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
+       if  prm['debug_gpu_on'] then
+        _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
+      else
+        _TR_NET_:forward({input[1],input[2],input[3]} )
+      end
       refPos = _TR_NET_:get(2):get(1):get(2).output:clone():float();
       refPos = utils.mask(refPos,disp_max)
       refPos = utils.softmax(refPos)

@@ -3,11 +3,11 @@ mcCnnFst = dofile('CMcCnnFst.lua')
 dofile('CAddMatrix.lua')
 dofile('CContrastMax2ndMax.lua')
 
-disp_max = 10
-img_w = 30
+disp_max = 228
+img_w = 1242
 hpatch = 4
-fNetRef, hpatch = mcCnnFst.get(4, 64, 3)
 dist_min = 2
+fNetRef, hpatch = mcCnnFst.get(4, 64, 3)
 
 
 local Net = nn.Sequential()
