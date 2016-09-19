@@ -35,7 +35,7 @@ cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
 -- debug
 cmd:option('-debug_fname', 'test_dynLargeScale')
-cmd:option('-debug_gpu_on', false)
+cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_only_test_on', false)
 cmd:option('-debug_start_from_timestamp', '')
