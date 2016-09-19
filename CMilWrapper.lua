@@ -1,6 +1,6 @@
 local milWrapper = {}
 
-function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, max_order, max_r, fnet)
+function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, dist_min, fnet)
 
 local fNetRef = fnet:clone();
  
@@ -79,33 +79,39 @@ dNetPosRef:add(nn.Transpose{1,2})
 
 -- pos-ref and ref-pos matrices we will use twice to compute rowwise max and 
 -- rowwise second max, therefore lets split them 
-dNetRefPos:add(nn.Replicate(2))
-dNetRefPos:add(nn.SplitTable(1))
-local dNetRefPosSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
-dNetRefPos:add(dNetRefPosSpl)
-local dNetRefPosMax = nn.Sequential()
-local dNetRefPosMaxM = nn.Sequential()
-dNetRefPosSpl:add(dNetRefPosMax)
-dNetRefPosSpl:add(dNetRefPosMaxM)
+--dNetRefPos:add(nn.Replicate(2))
+--dNetRefPos:add(nn.SplitTable(1))
+--local dNetRefPosSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
+--dNetRefPos:add(dNetRefPosSpl)
+--local dNetRefPosMax = nn.Sequential()
+--local dNetRefPosMaxM = nn.Sequential()
+--dNetRefPosSpl:add(dNetRefPosMax)
+--dNetRefPosSpl:add(dNetRefPosMaxM)
 
-dNetPosRef:add(nn.Replicate(2))
-dNetPosRef:add(nn.SplitTable(1))
-local dNetPosRefSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
-dNetPosRef:add(dNetPosRefSpl)
-local dNetPosRefMax = nn.Sequential()
-local dNetPosRefMaxM = nn.Sequential()
-dNetPosRefSpl:add(dNetPosRefMax)
-dNetPosRefSpl:add(dNetPosRefMaxM)
+--dNetPosRef:add(nn.Replicate(2))
+--dNetPosRef:add(nn.SplitTable(1))
+--local dNetPosRefSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
+--dNetPosRef:add(dNetPosRefSpl)
+--local dNetPosRefMax = nn.Sequential()
+--local dNetPosRefMaxM = nn.Sequential()
+--dNetPosRefSpl:add(dNetPosRefMax)
+--dNetPosRefSpl:add(dNetPosRefMaxM)
 
--- now compute max for: posRefMax, refPosMax, refNeg, posNeg
--- and Mth max for: posRefMaxM and refPosMaxM
-dNetPosRefMax:add(nn.Max(2))
-dNetRefPosMax:add(nn.Max(2))
+---- now compute max for: posRefMax, refPosMax, refNeg, posNeg
+---- and Mth max for: posRefMaxM and refPosMaxM
+--dNetPosRefMax:add(nn.Max(2))
+--dNetRefPosMax:add(nn.Max(2))
+--dNetRefNeg:add(nn.Max(2))
+--dNetNegPos:add(nn.Max(2))
+--dNetPosRefMaxM:add(nn.MaxM(2, max_order, max_r))
+--dNetRefPosMaxM:add(nn.MaxM(2, max_order, max_r))
+
 dNetRefNeg:add(nn.Max(2))
 dNetNegPos:add(nn.Max(2))
-dNetPosRefMaxM:add(nn.MaxM(2, max_order, max_r))
-dNetRefPosMaxM:add(nn.MaxM(2, max_order, max_r))
-
+dNetRefPos:add(nn.contrastMax2ndMax(dist_min))
+dNetRefPos:add(nn.SplitTable(2))
+dNetPosRef:add(nn.contrastMax2ndMax(dist_min))
+dNetPosRef:add(nn.SplitTable(2))
 
 -- flatten tables hierarchy
 -- after flattening, order is following 

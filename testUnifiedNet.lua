@@ -1,6 +1,7 @@
 require 'nn'
 mcCnnFst = dofile('CMcCnnFst.lua')
 dofile('CAddMatrix.lua')
+dofile('CContrastMax2ndMax.lua')
 dofile('CMaxM.lua')
 
 disp_max = 200
@@ -8,7 +9,7 @@ img_w = 1000
 hpatch = 4
 max_order = 3
 fnet, hpatch = mcCnnFst.get(4, 64, 3)
-
+dist_min = 2
 local fNetRef = fnet:clone();
  
 local Net = nn.Sequential()
@@ -85,82 +86,90 @@ dNetRefPos:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
 dNetPosRef:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
 dNetPosRef:add(nn.Transpose{1,2})
 
+
 -- pos-ref and ref-pos matrices we will use twice to compute rowwise max and 
 -- rowwise second max, therefore lets split them 
-dNetRefPos:add(nn.Replicate(2))
-dNetRefPos:add(nn.SplitTable(1))
-local dNetRefPosSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
-dNetRefPos:add(dNetRefPosSpl)
-local dNetRefPosMax = nn.Sequential()
-local dNetRefPosMaxM = nn.Sequential()
-dNetRefPosSpl:add(dNetRefPosMax)
-dNetRefPosSpl:add(dNetRefPosMaxM)
+--dNetRefPos:add(nn.Replicate(2))
+--dNetRefPos:add(nn.SplitTable(1))
+--local dNetRefPosSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
+--dNetRefPos:add(dNetRefPosSpl)
+--local dNetRefPosMax = nn.Sequential()
+--local dNetRefPosMaxM = nn.Sequential()
+--dNetRefPosSpl:add(dNetRefPosMax)
+--dNetRefPosSpl:add(dNetRefPosMaxM)
 
-dNetPosRef:add(nn.Replicate(2))
-dNetPosRef:add(nn.SplitTable(1))
-local dNetPosRefSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
-dNetPosRef:add(dNetPosRefSpl)
-local dNetPosRefMax = nn.Sequential()
-local dNetPosRefMaxM = nn.Sequential()
-dNetPosRefSpl:add(dNetPosRefMax)
-dNetPosRefSpl:add(dNetPosRefMaxM)
+--dNetPosRef:add(nn.Replicate(2))
+--dNetPosRef:add(nn.SplitTable(1))
+--local dNetPosRefSpl = nn.ParallelTable() -- splitter for ref-pos distance matrix
+--dNetPosRef:add(dNetPosRefSpl)
+--local dNetPosRefMax = nn.Sequential()
+--local dNetPosRefMaxM = nn.Sequential()
+--dNetPosRefSpl:add(dNetPosRefMax)
+--dNetPosRefSpl:add(dNetPosRefMaxM)
 
--- now compute max for: posRefMax, refPosMax, refNeg, posNeg
--- and Mth max for: posRefMaxM and refPosMaxM
-dNetPosRefMax:add(nn.Max(2))
-dNetRefPosMax:add(nn.Max(2))
+---- now compute max for: posRefMax, refPosMax, refNeg, posNeg
+---- and Mth max for: posRefMaxM and refPosMaxM
+--dNetPosRefMax:add(nn.Max(2))
+--dNetRefPosMax:add(nn.Max(2))
+--dNetRefNeg:add(nn.Max(2))
+--dNetNegPos:add(nn.Max(2))
+--dNetPosRefMaxM:add(nn.MaxM(2, max_order, max_r))
+--dNetRefPosMaxM:add(nn.MaxM(2, max_order, max_r))
+
 dNetRefNeg:add(nn.Max(2))
 dNetNegPos:add(nn.Max(2))
-dNetPosRefMaxM:add(nn.MaxM(2, max_order))
-dNetRefPosMaxM:add(nn.MaxM(2, max_order))
+dNetRefPos:add(nn.contrastMax2ndMax(dist_min))
+dNetRefPos:add(nn.SplitTable(2))
+dNetPosRef:add(nn.contrastMax2ndMax(dist_min))
+dNetPosRef:add(nn.SplitTable(2))
 
 
--- flatten tables hierarchy
--- after flattening, order is following 
--- ref-pos-max, ref-pos-maxm, pos-ref-max, pos-ref-maxm, ref-neg-max, pos-neg-max
+---- flatten tables hierarchy
+---- after flattening, order is following 
+---- ref-pos-max, ref-pos-maxm, pos-ref-max, pos-ref-maxm, ref-neg-max, pos-neg-max
 Net:add(nn.FlattenTable())
 
--- make 4 output tables of tables
-local dNet2CostCom = nn.ConcatTable()
-Net:add(dNet2CostCom); -- feature net to distance net commutator
-local milFwd = nn.Sequential()
-local milBwd = nn.Sequential()
-local maxFwd = nn.Sequential()
-local maxBwd = nn.Sequential()
-dNet2CostCom:add(milFwd)
-dNet2CostCom:add(milBwd)
-dNet2CostCom:add(maxFwd)
-dNet2CostCom:add(maxBwd)
-local milFwdSel = nn.ConcatTable()  -- input selectors for cost
-local milBwdSel = nn.ConcatTable()
-local maxFwdSel = nn.ConcatTable()  -- input selectors for each distance net
-local maxBwdSel = nn.ConcatTable()
-milFwd:add(milFwdSel)
-milBwd:add(milBwdSel)
-maxFwd:add(maxFwdSel)
-maxBwd:add(maxBwdSel)
-milFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
-milFwdSel:add(nn.SelectTable(5))  -- ref-neg-max
-milBwdSel:add(nn.SelectTable(3))  -- pos-ref-max
-milBwdSel:add(nn.SelectTable(6))  -- ref-neg-max
-maxFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
-maxFwdSel:add(nn.SelectTable(2))  -- ref-pos-maxm
-maxBwdSel:add(nn.SelectTable(3))  -- ref-pos-max
-maxBwdSel:add(nn.SelectTable(4))  -- ref-pos-maxm
+---- make 4 output tables of tables
+--local dNet2CostCom = nn.ConcatTable()
+--Net:add(dNet2CostCom); -- feature net to distance net commutator
+--local milFwd = nn.Sequential()
+--local milBwd = nn.Sequential()
+--local maxFwd = nn.Sequential()
+--local maxBwd = nn.Sequential()
+--dNet2CostCom:add(milFwd)
+--dNet2CostCom:add(milBwd)
+--dNet2CostCom:add(maxFwd)
+--dNet2CostCom:add(maxBwd)
+--local milFwdSel = nn.ConcatTable()  -- input selectors for cost
+--local milBwdSel = nn.ConcatTable()
+--local maxFwdSel = nn.ConcatTable()  -- input selectors for each distance net
+--local maxBwdSel = nn.ConcatTable()
+--milFwd:add(milFwdSel)
+--milBwd:add(milBwdSel)
+--maxFwd:add(maxFwdSel)
+--maxBwd:add(maxBwdSel)
+--milFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
+--milFwdSel:add(nn.SelectTable(5))  -- ref-neg-max
+--milBwdSel:add(nn.SelectTable(3))  -- pos-ref-max
+--milBwdSel:add(nn.SelectTable(6))  -- ref-neg-max
+--maxFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
+--maxFwdSel:add(nn.SelectTable(2))  -- ref-pos-maxm
+--maxBwdSel:add(nn.SelectTable(3))  -- ref-pos-max
+--maxBwdSel:add(nn.SelectTable(4))  -- ref-pos-maxm
 
-milFwd_margin = 0.2
-milBwd_margin = 0.2
-maxFwd_margin = 0.2
-maxBwd_margin = 0.2
-milFwd_w = 0.25;
-milBwd_w = 0.25;
-maxFwd_w = 0.25;
-maxBwd_w = 0.25;
-milFwdCst = nn.MarginRankingCriterion(milFwd_margin);
-milBwdCst = nn.MarginRankingCriterion(milBwd_margin);
-maxFwdCst = nn.MarginRankingCriterion(maxFwd_margin);
-maxBwdCst = nn.MarginRankingCriterion(maxBwd_margin);
-parCri = nn.ParallelCriterion(true):add(milFwdCst,milFwd_w):add(milBwdCst,milBwd_w):add(maxFwdCst,maxFwd_w):add(maxBwdCst,maxBwd_w)
+--milFwd_margin = 0.2
+--milBwd_margin = 0.2
+--maxFwd_margin = 0.2
+--maxBwd_margin = 0.2
+--milFwd_w = 0.25;
+--milBwd_w = 0.25;
+--maxFwd_w = 0.25;
+--maxBwd_w = 0.25;
+--milFwdCst = nn.MarginRankingCriterion(milFwd_margin);
+--milBwdCst = nn.MarginRankingCriterion(milBwd_margin);
+--maxFwdCst = nn.MarginRankingCriterion(maxFwd_margin);
+--maxBwdCst = nn.MarginRankingCriterion(maxBwd_margin);
+--parCri = nn.ParallelCriterion(true):add(milFwdCst,milFwd_w):add(milBwdCst,milBwd_w):add(maxFwdCst,maxFwd_w):add(maxBwdCst,maxBwd_w)
 
 targ =  torch.ones(1, (img_w - disp_max - 2*hpatch))
 netIn = {torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w)};
@@ -173,7 +182,3 @@ outGradCri = parCri:backward(netOut, targ)
 
 --outcrit = criterion:forward(output,torch.Tensor{1})
 
-y
-
-
-print(output)

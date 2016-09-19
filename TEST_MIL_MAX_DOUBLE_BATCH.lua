@@ -26,8 +26,7 @@ cmd:option('-train_epoch_size', 100*1024) -- 100*1024
 cmd:option('-train_nb_epoch', 300)
 -- loss
 cmd:option('-loss_margin', 0.2)
-cmd:option('-max_order', 2)
-cmd:option('-max_r', 2)
+cmd:option('-dist_min', 2)
 -- network
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
@@ -37,7 +36,7 @@ cmd:option('-debug_fname', 'milMaxLargeScale_maxsup')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_only_test_on', false)
-cmd:option('-debug_start_from_timestamp', '')
+cmd:option('-debug_start_from_timestamp', '2016_09_15_17:59:04')
 prm = cmd:parse(arg)
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
 
@@ -75,7 +74,7 @@ else
   _OPTIM_STATE_ = {}
 end
 
-_TR_NET_ = milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, prm['max_order'], prm['max_r'], _BASE_FNET_)
+_TR_NET_ = milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, prm['dist_min'], _BASE_FNET_)
 
 if prm['debug_gpu_on'] then
   _TR_NET_:cuda()
