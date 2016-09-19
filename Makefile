@@ -1,4 +1,4 @@
-PREFIX=/home/tulyakov/torch/install
+PREFIX=$(Torch_ROOT)
 
 CFLAGS=-I$(PREFIX)/include/THC -I$(PREFIX)/include/TH -I$(PREFIX)/include
 LDFLAGS_NVCC=-L$(PREFIX)/lib -Xlinker -rpath,$(PREFIX)/lib -lluaT -lTHC -lTH -lpng
