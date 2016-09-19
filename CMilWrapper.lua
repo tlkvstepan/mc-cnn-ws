@@ -1,6 +1,16 @@
 local milWrapper = {}
 
 
+function milWrapper.getTrNet(img_w, disp_max, hpatch, dist_min, fnet)
+--[[ 
+  Interface functon: it returns network for semi-supervised training, given
+  name of semi-supervised training net - _name_;
+  parameters - _param_;
+  and base feature net - _fnet_
+    
+--]]
+end
+
 function milWrapper.getMilMaxDoubleBatch(img_w, disp_max, hpatch, dist_min, fnet)
 
 local fNetRef = fnet:clone();

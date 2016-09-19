@@ -1,37 +1,55 @@
+--[[ 
+This is universal script for semi-supervised training of network 
+]]-
+
+-- Standard modules
+
 require 'torch'
 require 'gnuplot'
 require 'optim'
 require 'nn'
 
-require 'libdynprog'
-dofile('DataLoader.lua');
-dofile('CUnsup3EpiSet.lua');
-dofile('CContrastDynProgMax.lua');
-dofile('CSup1Patch1EpiSet.lua');
-mcCnnFst = dofile('CMcCnnFst.lua');
-testFun = dofile('CTestFun.lua');
-dofile('CAddMatrix.lua')
-milWrapper = dofile('CMilWrapper.lua')
-utils = dofile('utils.lua');
+-- Custom modules
 
--- set randomseed to insure repeatability
+dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to the input (I use it for masking purposes)
+
+require 'libdynprog'                      -- C++ module for dynamic programming
+dofile('CContrastDynProgMax.lua');        -- Contrastive dynamic programming module
+dofile('CContrastMax2ndMax.lua');         -- Contrastive max-2ndMax module
+
+dofile('DataLoader.lua');                 -- Parent class for dataloaders
+dofile('CUnsup3EpiSet.lua');              -- Unsupervised training set loader
+dofile('CSup1Patch1EpiSet.lua');          -- Supervised validation set loader
+
+mcCnnFst = dofile('CMcCnnFst.lua');       -- Function that makes base net
+milWrapper = dofile('CMilWrapper.lua')    -- Function that "wrap" base net into training net
+testFun = dofile('CTestFun.lua');         -- Function that performs test on validation set
+
+utils = dofile('utils.lua');              -- Utils for loading and visualization
+
+-- Set random seeds for math and torch for repeatability
+
 math.randomseed(0); 
 torch.manualSeed(0)
 
 -- |parse input parameters|
 cmd = torch.CmdLine()
--- learning
-cmd:option('-test_set_size', 50000)      -- 200000
+
+-- optimization parameters parameters
+cmd:option('-test_set_size', 50000)       -- 50000
 cmd:option('-train_batch_size', 1024)     -- 1024
 cmd:option('-train_epoch_size', 100*1024) -- 100*1024
-cmd:option('-train_nb_epoch', 300)
--- loss
+cmd:option('-train_nb_epoch', 300)        -- 300
+
+-- training network parameters
 cmd:option('-loss_margin', 0.2)
 cmd:option('-dist_min', 2)
--- network
+
+-- feature network parameters
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
+
 -- debug
 cmd:option('-debug_fname', 'test_dynLargeScale')
 cmd:option('-debug_gpu_on', true)

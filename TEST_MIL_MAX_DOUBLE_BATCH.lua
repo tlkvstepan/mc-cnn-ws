@@ -10,7 +10,6 @@ dofile('CSup1Patch1EpiSet.lua');
 mcCnnFst = dofile('CMcCnnFst.lua');
 testFun = dofile('CTestFun.lua');
 dofile('CAddMatrix.lua')
-dofile('CMaxM.lua')
 milWrapper = dofile('CMilWrapper.lua')
 utils = dofile('utils.lua');
 

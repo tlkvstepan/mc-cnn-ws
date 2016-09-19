@@ -10,7 +10,6 @@ mcCnnFst = dofile('CMcCnnFst.lua');
 dofile('CContrastMax2ndMax.lua');
 testFun = dofile('CTestFun.lua');
 dofile('CAddMatrix.lua')
-dofile('CMaxM.lua')
 milWrapper = dofile('CMilWrapper.lua')
 utils = dofile('utils.lua');
 
