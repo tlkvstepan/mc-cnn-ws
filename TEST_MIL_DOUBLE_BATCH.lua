@@ -150,11 +150,9 @@ end
 if prm['debug_save_on'] then
   logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
   logger:setNames{'Training loss', 
-    'Overall test accuracy', 
-    'Test accuracy 1-2 px',
-    'Test accuracy 1-5 px'}
+    '<3 disparity error', 
+    '<5 disparity error'}
   logger:style{'+-',
-    '+-',
     '+-',
     '+-'}
 end    

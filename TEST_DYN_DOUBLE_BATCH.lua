@@ -34,11 +34,11 @@ cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
 -- debug
-cmd:option('-debug_fname', 'test_milDynLargeScale')
+cmd:option('-debug_fname', 'test_dynLargeScale')
 cmd:option('-debug_gpu_on', false)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_only_test_on', false)
-cmd:option('-debug_start_from_timestamp', '2016_09_16_21:21:26')
+cmd:option('-debug_start_from_timestamp', '')
 prm = cmd:parse(arg)
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
 
@@ -154,11 +154,9 @@ end
 if prm['debug_save_on'] then
   logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
   logger:setNames{'Training loss', 
-    'Overall test accuracy', 
-    'Test accuracy 1-2 px',
-    'Test accuracy 1-5 px'}
+    '<3 disparity error', 
+    '<5 disparity error'}
   logger:style{'+-',
-    '+-',
     '+-',
     '+-'}
 end    
