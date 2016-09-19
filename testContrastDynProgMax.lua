@@ -1,4 +1,6 @@
 require 'nn'
+require 'libdynprog'
+
 dofile('CContrastDynProgMax.lua')
 
 input = torch.rand(1006,1034)

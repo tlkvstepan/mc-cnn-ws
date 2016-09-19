@@ -24,9 +24,17 @@ function contrastDynProgMax:updateOutput(input)
   local _outputDynProg = torch.Tensor(input:size(1),1)
    
    -- compute dynamic programming solution 
-  local aE, aWay = self:accumulate(_input)
-  self._indicesDynProg = nn.utils.addSingletonDimension(self:trace(aE, aWay):long(),2)
-  local _outputDynProg =  _input:gather(2,  self._indicesDynProg)
+  local aE =  torch.FloatTensor(input:size(1),input:size(2))
+  local aP =  torch.FloatTensor(input:size(1),input:size(2))
+  self._indicesDynProg = torch.FloatTensor(input:size(1))
+  local _outputDynProg =  torch.FloatTensor(input:size(1))
+
+  dynprog.compute(input:float(), aE, aP, self._indicesDynProg, _outputDynProg);
+  
+  _outputDynProg=_outputDynProg:double()
+
+  self._indicesDynProg = nn.utils.addSingletonDimension(self._indicesDynProg:long(),2)
+  self._indicesDynProg = self._indicesDynProg + 1;
   
   -- mask dyn prog solution and all neighbours of the sol
    for dist = -self.distMin, self.distMin do
@@ -44,66 +52,6 @@ function contrastDynProgMax:updateOutput(input)
       
    return self.output
 end
-
-
-function contrastDynProgMax:trace(aEnergy, aWay)
-  
-  local h = aEnergy:size(1)
-  local w = aEnergy:size(2)
-  
-  local trj = torch.zeros(h)
-  local E
-  
-  -- find best energy in last column
-  E, trj[h] = torch.max(aEnergy[{{h},{}}],2)
-  
-  -- propogate best energy back
-  for nrow = h-1, 1, -1  do
-    trj[nrow] = aWay[{{nrow+1},{trj[nrow+1]}}]
-  end
-
-  return trj
-end
-
-function contrastDynProgMax:accumulate(energy)
-  
-  local h = energy:size(1)
-  local w = energy:size(2)
-  
-  -- initialize top row of accumulated energy to energy
-  local aEnergy = energy:clone()  
-  local aWay = torch.zeros(h, w)
-  
-  -- go from top row down, computing best accumulated energy in every position 
-  for nrow = 2,h do
-    
-    local maxIdx = torch.Tensor(w)
-    local maxVal = torch.Tensor(w)
-    maxIdx[1] = 1;
-    maxVal[1] = aEnergy[{{nrow-1},{1}}]
-    for ncol = 2,w do
-        if( maxVal[ncol-1] < aEnergy[{{nrow-1},{ncol}}]:squeeze() ) then
-          maxVal[ncol] = aEnergy[{{nrow-1},{ncol}}]
-          maxIdx[ncol] = ncol;
-        else
-          maxIdx[ncol] = maxIdx[ncol-1];
-          maxVal[ncol] = maxVal[ncol-1] 
-        end
-    end
-  
-    -- nonstrict monotonicity - we can never go right
-    for ncol = 1,w do
-      local bestEnergy = maxVal[ncol] 
-      local bestInd = maxIdx[ncol]
-      aEnergy[{{nrow},{ncol}}] = bestEnergy + energy[{{nrow},{ncol}}]
-      aWay[{{nrow},{ncol}}] = bestInd;
-    end
-    
-  end
-  
-  return aEnergy, aWay
-end
-
 
 function contrastDynProgMax:updateGradInput(input, gradOutput)
    

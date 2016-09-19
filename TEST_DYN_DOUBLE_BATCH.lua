@@ -3,6 +3,7 @@ require 'gnuplot'
 require 'optim'
 require 'nn'
 
+require 'libdynprog'
 dofile('DataLoader.lua');
 dofile('CUnsup3EpiSet.lua');
 dofile('CContrastDynProgMax.lua');
@@ -21,9 +22,9 @@ torch.manualSeed(0)
 -- |parse input parameters|
 cmd = torch.CmdLine()
 -- learning
-cmd:option('-test_set_size', 100)      -- 200000
-cmd:option('-train_batch_size', 1)     -- 1024
-cmd:option('-train_epoch_size', 1) -- 100*1024
+cmd:option('-test_set_size', 50000)      -- 200000
+cmd:option('-train_batch_size', 1024)     -- 1024
+cmd:option('-train_epoch_size', 100*1024) -- 100*1024
 cmd:option('-train_nb_epoch', 300)
 -- loss
 cmd:option('-loss_margin', 0.2)
@@ -132,7 +133,7 @@ feval = function(x)
 
     -- backword pass
     _TR_NET_:backward(sample_input, _CRITERION_:backward(_TR_NET_.output, sample_target))
-
+     collectgarbage()
   end
   _TR_ERR_ = _TR_ERR_ / prm['train_batch_size'] / 2
   _TR_PGRAD_:div(2*prm['train_batch_size']);
