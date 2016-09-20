@@ -53,6 +53,8 @@ function contrastDynProgMax:updateOutput(input)
       self.output = torch.cat({_outputDynProg:cuda(),_outputMax:cuda()},2)
       self._indicesMax = self._indicesMax:cuda()
       self._indicesDynProg = self._indicesDynProg:cuda()
+   else
+      self.output = torch.cat({_outputDynProg,_outputMax},2)
    end  
    return self.output
 end

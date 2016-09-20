@@ -1,9 +1,11 @@
 require 'nn'
+require 'cunn'
 mcCnnFst = dofile('CMcCnnFst.lua')
 dofile('CAddMatrix.lua')
 require 'libdynprog'
+dofile('CDynProg.lua')
 dofile('CContrastDynProgMax.lua')
-dofile('CMaxM.lua')
+
 
 disp_max = 200
 img_w = 1000
@@ -87,8 +89,12 @@ dNetRefPos:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
 dNetPosRef:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
 dNetPosRef:add(nn.Transpose{1,2})
 
-dNetRefNeg:add(nn.Max(2))
-dNetNegPos:add(nn.Max(2))
+-- find best dprog solution for ref-neg and neg-pos
+dNetRefNeg:add(nn.dynProg(dist_min))
+dNetNegPos:add(nn.dynProg(dist_min))
+
+-- find dprog solution for ref-pos and pos-ref
+-- and alternative max solution that is on minimum distance from dprog solution
 dNetRefPos:add(nn.contrastDynProgMax(dist_min))
 dNetRefPos:add(nn.SplitTable(2))
 dNetPosRef:add(nn.contrastDynProgMax(dist_min))
@@ -96,14 +102,53 @@ dNetPosRef:add(nn.SplitTable(2))
 
 ---- flatten tables hierarchy
 ---- after flattening, order is following 
----- ref-pos-max, ref-pos-maxm, pos-ref-max, pos-ref-maxm, ref-neg-max, pos-neg-max
+---- ref-pos-dprog, ref-pos-max, pos-ref-dprog, pos-ref-max, ref-neg-dprog, pos-neg-dprog
 Net:add(nn.FlattenTable())
 
+-- make 4 output tables of tables
+local dNet2CostCom = nn.ConcatTable()
+Net:add(dNet2CostCom); -- feature net to distance net commutator
+local milFwd = nn.Sequential()
+local milBwd = nn.Sequential()
+local contrastFwd = nn.Sequential()
+local contrastBwd = nn.Sequential()
+dNet2CostCom:add(milFwd)
+dNet2CostCom:add(milBwd)
+dNet2CostCom:add(contrastFwd)
+dNet2CostCom:add(contrastBwd)
+local milFwdSel = nn.ConcatTable()  -- input selectors for cost
+local milBwdSel = nn.ConcatTable()
+local contrastFwdSel = nn.ConcatTable()  -- input selectors for each distance net
+local contrastBwdSel = nn.ConcatTable()
+milFwd:add(milFwdSel)
+milBwd:add(milBwdSel)
+contrastFwd:add(contrastFwdSel)
+contrastBwd:add(contrastBwdSel)
+milFwdSel:add(nn.SelectTable(1))  -- ref-pos-dprog
+milFwdSel:add(nn.SelectTable(5))  -- ref-neg-dprog
+milBwdSel:add(nn.SelectTable(3))  -- pos-ref-dprog
+milBwdSel:add(nn.SelectTable(6))  -- ref-neg-dprog
+contrastFwdSel:add(nn.SelectTable(1))  -- ref-pos-dprog
+contrastFwdSel:add(nn.SelectTable(2))  -- ref-pos-max
+contrastBwdSel:add(nn.SelectTable(3))  -- ref-pos-dprog
+contrastBwdSel:add(nn.SelectTable(4))  -- ref-pos-max
 
---targ =  torch.ones(1, (img_w - disp_max - 2*hpatch))
-netIn = {torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w)};
+-- cpu
+start_cpu = os.time()
+input_cpu = {torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w)};
+output_cpu = Net:forward(input_cpu);
+end_cpu = os.time()
+print(os.difftime(end_cpu, start_cpu))
 
-netOut = Net:forward(netIn);
+
+-- cuda
+input = {torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda()};
+Net:cuda()
+start_gpu = os.time()
+output_gpu = Net:forward(input)
+end_gpu = os.time()
+print(os.difftime(end_gpu, start_gpu))
+
 criOut = parCri:forward(netOut, targ)
 outGradCri = parCri:backward(netOut, targ)
   
