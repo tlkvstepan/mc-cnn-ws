@@ -19,8 +19,8 @@ function contrastDynProgMax:__init(distMin)
 end
 
 function contrastDynProgMax:updateOutput(input)
-   
-  local _input = input:clone()
+  
+  local _input = input:clone():double()
   local _outputDynProg = torch.Tensor(input:size(1),1)
    
    -- compute dynamic programming solution 
@@ -48,8 +48,12 @@ function contrastDynProgMax:updateOutput(input)
    local _outputMax
    _outputMax, self._indicesMax = torch.max(_input, 2)
       
-   self.output = torch.cat({_outputDynProg,_outputMax},2)
-      
+   -- if input is cuda tensor than do only dprog on CPU 
+   if input:type() == "torch.CudaTensor" then
+      self.output = torch.cat({_outputDynProg:cuda(),_outputMax:cuda()},2)
+      self._indicesMax = self._indicesMax:cuda()
+      self._indicesDynProg = self._indicesDynProg:cuda()
+   end  
    return self.output
 end
 
