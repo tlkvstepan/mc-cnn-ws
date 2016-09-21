@@ -1,7 +1,7 @@
 
-local mcCnnFst = {}
+local baseNet = {}
 
-function mcCnnFst.get( nbConvLayers, nbFeatureMap, kernel, pad_on)
+function baseNet.get( nbConvLayers, nbFeatureMap, kernel, pad_on)
     
   local fNet = nn.Sequential();
   
@@ -47,4 +47,4 @@ function mcCnnFst.get( nbConvLayers, nbFeatureMap, kernel, pad_on)
 
 end
 
-return mcCnnFst
+return baseNet

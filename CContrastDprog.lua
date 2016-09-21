@@ -8,9 +8,9 @@
 
 --]]
 
-local contrastDynProgMax, parent = torch.class('nn.contrastDynProgMax', 'nn.Module')
+local contrastDprog, parent = torch.class('nn.contrastDprog', 'nn.Module')
 
-function contrastDynProgMax:__init(distMin)
+function contrastDprog:__init(distMin)
    parent.__init(self)
    self.distMin = distMin
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
@@ -18,7 +18,7 @@ function contrastDynProgMax:__init(distMin)
    self._indicesMax = torch.Tensor()
 end
 
-function contrastDynProgMax:updateOutput(input)
+function contrastDprog:updateOutput(input)
   
   local _input = input:clone():double()
   local _outputDynProg = torch.Tensor(input:size(1),1)
@@ -29,7 +29,7 @@ function contrastDynProgMax:updateOutput(input)
   self._indicesDynProg = torch.FloatTensor(input:size(1))
   local _outputDynProg =  torch.FloatTensor(input:size(1))
 
-  dynprog.compute(input:float(), aE, aP, self._indicesDynProg, _outputDynProg);
+  dprog.compute(input:float(), aE, aP, self._indicesDynProg, _outputDynProg);
   
   _outputDynProg=_outputDynProg:double()
 
@@ -59,7 +59,7 @@ function contrastDynProgMax:updateOutput(input)
    return self.output
 end
 
-function contrastDynProgMax:updateGradInput(input, gradOutput)
+function contrastDprog:updateGradInput(input, gradOutput)
    
    -- pass input gradient to dyn prog and max 
    self.gradInput:resizeAs(input):zero()
