@@ -12,23 +12,23 @@
 *4. Implement cost that maximize difference between first and second maximums
 *5. Implement net that efficiently combine two cost computation
 *6. Implement alternative testing and get results for learned net (several error thresholds)
+*7. Implement and test contrastive net with dynamic programing only
+*8. Implement contrastive net with mil
+*9. Implement mil dprog
 
-7. Implement and test contrastive net with dynamic programing only
-8. Implement contrastive net with mil
+-- 21.09
+1. black on white for distance matrix
+1. make test net function
+2. test set is 2 epipolar lines (use all points with known gt) 
+3. draw actual epipolar line profile (or points)
+4. make compare net matlab function
+5. make visualize train matlab function
+6. prepare for experiments with middlebury dataset
+7. tune stereo pipeline with best of our nets (1000 random parameters samples)
+8. compare best of our net with supervised
+9. make equi-performance curve on our test set (for best of our nets and supervised)    
+    
 
-
-
-
-8. Equi-performance curve   
-9. Tune stereo paremeters for our descriptor (1000 random samples)
-10. Compare against mc-cnn on stereo
-11. Test how both costs behave on their own.
-12. Try to combine them with MIL objective.
-13. Use all training data for KITTI
-14. Make validation and test set to tune parameters (such as early stopping)
-15. Set up experiment for Middlebury, Stretcha datasets
-16. Modify optim logger
-17. Use cmd parameter logger
 % ideas
 0. oversharpening of maximum. since ground truth is not precise some positives might be cosidered as negatives
    maybe our algorithm does better than ground truth?
@@ -37,4 +37,4 @@
 1. dynamic programming (self learning)
 2. learn smoothness cost and reiterate (self learning)
 3. training data is errorneous
-5. impose order: closer to true maximim higher similarity
+4. impose order: closer to true maximim higher similarity
