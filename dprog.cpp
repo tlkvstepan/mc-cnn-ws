@@ -130,7 +130,7 @@ static const struct luaL_Reg funcs[] = {
     {NULL, NULL}
 };
 
-extern "C" int luaopen_libdynprog(lua_State *L) {
-    luaL_openlib(L, "dynprog", funcs, 0);
+extern "C" int luaopen_libdprog(lua_State *L) {
+    luaL_openlib(L, "dprog", funcs, 0);
     return 1;
 }

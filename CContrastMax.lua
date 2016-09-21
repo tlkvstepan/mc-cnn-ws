@@ -8,9 +8,9 @@
 
 --]]
 
-local contrastMax2ndMax, parent = torch.class('nn.contrastMax2ndMax', 'nn.Module')
+local contrastMax, parent = torch.class('nn.contrastMax', 'nn.Module')
 
-function contrastMax2ndMax:__init(distMin)
+function contrastMax:__init(distMin)
    parent.__init(self)
    self.distMin = distMin
    -- these vector store indices of 1st and 2nd row-wise maximums
@@ -18,7 +18,7 @@ function contrastMax2ndMax:__init(distMin)
    self._indices2ndMax = torch.Tensor()
 end
 
-function contrastMax2ndMax:updateOutput(input)
+function contrastMax:updateOutput(input)
    
    local _input = input:clone()
    local _outputMax
@@ -42,7 +42,7 @@ function contrastMax2ndMax:updateOutput(input)
    return self.output
 end
 
-function contrastMax2ndMax:updateGradInput(input, gradOutput)
+function contrastMax:updateGradInput(input, gradOutput)
    
    -- pass input gradient to max and second max 
    self.gradInput:resizeAs(input):zero()
