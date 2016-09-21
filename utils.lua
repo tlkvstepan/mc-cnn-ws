@@ -147,5 +147,15 @@ function utils.get_window_size(net)
    return ws
 end
 
+-- copy module parameters of net
+function utils.copynet(dst, src)
+  for i = 1,#src.modules do
+    if torch.typename(src.modules[i]) == 'cudnn.SpatialConvolution' or torch.typename(src.modules[i]) == 'nn.SpatialConvolution' then
+      dst.modules[i].weight:copy(src.modules[i].weight:double())
+      dst.modules[i].bias:copy(src.modules[i].bias:double())
+    end
+  end
+  return dst
+end      
 
 return utils

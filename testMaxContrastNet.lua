@@ -1,7 +1,7 @@
 require 'nn'
-mcCnnFst = dofile('CMcCnnFst.lua')
+mcCnnFst = dofile('CBaseNet.lua')
 dofile('CAddMatrix.lua')
-dofile('CContrastMax2ndMax.lua')
+dofile('CContrastMax.lua')
 
 disp_max = 228
 img_w = 1242
@@ -40,20 +40,21 @@ splitter:add(stream2)
 
 -- stream1 :
 stream1:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
-stream1:add(nn.contrastMax2ndMax(dist_min))
+stream1:add(nn.contrastMax(dist_min))
+stream1:add(nn.SplitTable(2))
 
 -- stream2 :
 stream2:add(nn.Narrow(2,1, img_w - 2*hpatch - disp_max))
 stream2:add(nn.Transpose({1,2}))
-stream2:add(nn.contrastMax2ndMax(dist_min))
+stream2:add(nn.contrastMax(dist_min))
+stream2:add(nn.SplitTable(2))
 
-Net:add(nn.JoinTable(1))
-Net:add(nn.SplitTable(2))
+--Net:add(nn.JoinTable(1))
 
 -- add criterion (y should always be 1)
 --criterion:add(nn.HingeEmbeddingCriterion(0.1))
 
-input = {torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w)};
+input = {torch.rand(1,2*hpatch+1,img_w), torch.rand(1,2*hpatch+1,img_w),torch.rand(1,2*hpatch+1,img_w) };
 criterion = nn.HingeEmbeddingCriterion(1);
 
 output = Net:forward(input);

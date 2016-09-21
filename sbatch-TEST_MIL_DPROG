@@ -1,5 +1,4 @@
 #!/bin/bash
-# HERE WE PREPARE TEST IMAGES FOR SUBMISSION TO MIDDLEBURY WEBSITE
 #SBATCH --workdir /home/tulyakov/research/mil-mc-cnn
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
@@ -9,11 +8,11 @@
 #SBATCH --qos gpu
 #SBATCH --gres gpu:1
 #SBATCH --partition=gpu
-echo STARTING AT `date`
+echo TRAIN MIL_DPROG STARTING AT `date`
 source /etc/profile.d/slmodules.sh -r deprecated
 module purge
 module load cuda/7.0
 module load torch/7
 module load opencv/2.4.9/gcc-4.4.7
-th /home/tulyakov/research/mil-mc-cnn/TEST_MIL_DOUBLE_BATCH.lua 
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua mil-dprog -debug_fname 'mil-dprog' -debug_start_from_timestamp ''
 echo FINISHED at `date`

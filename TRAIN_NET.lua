@@ -112,7 +112,7 @@ end
 if arch == 'mil-max' then
   _TR_NET_, _CRITERION_ =  netWrapper.getMilMax(img_w, disp_max, hpatch, prm['loss_margin'], _BASE_FNET_)
 elseif arch == 'mil-dprog' then
-   -- not supported yet
+   _TR_NET_, _CRITERION_ =  netWrapper.getMilDprog(img_w, disp_max, hpatch, prm['loss_margin'], _BASE_FNET_)
 elseif arch == 'contrast-max' then
   _TR_NET_, _CRITERION_ = netWrapper.getContrastMax(img_w, disp_max, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)  
 elseif arch == 'contrast-dprog' then
@@ -282,21 +282,19 @@ if prm['debug_save_on'] then
   -- save distance matrices
   local lines = {290,433}
   for nline = 1,#lines do
-    input = unsupSet:index(torch.Tensor{lines[nline]})
+    local input = unsupSet:index(torch.Tensor{lines[nline]})
+    local valid_net = netWrapper.getDistNet(_BASE_FNET_)
     if  prm['debug_gpu_on'] then
-      _TR_NET_:forward({input[1]:cuda(),input[2]:cuda(),input[3]:cuda()} )
-    else
-      _TR_NET_:forward({input[1],input[2],input[3]} )
-    end
-    if arch == 'contrast-max' or arch == 'contrast-dprog' then
-      refPos = _TR_NET_:get(2).output:clone():float();
-    else
-      refPos = _TR_NET_:get(2):get(1):get(2).output:clone():float();
-    end
-    refPos = utils.mask(refPos,disp_max)
-    refPos = utils.softmax(refPos)
-    refPos = utils.scale2_01(refPos)
-    image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',refPos)
+      valid_net:cuda()
+      input[1] = input[1]:cuda()
+      input[2] = input[2]:cuda();
+      input[3] = input[3]:cuda();
+   end
+   local refPos = valid_net:forward(input):float();
+   refPos = utils.mask(refPos,disp_max)
+   refPos = utils.softmax(refPos)
+   refPos = utils.scale2_01(refPos)
+   image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',refPos)
   end
 end
 
