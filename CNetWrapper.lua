@@ -218,7 +218,7 @@ dNetPosRef:add(nn.SplitTable(2))
 
 -- flatten tables hierarchy
 -- after flattening, order is following 
--- ref-pos-max, ref-pos-maxm, pos-ref-max, pos-ref-maxm, ref-neg-max, pos-neg-max
+-- (1) ref-pos-max, (2) ref-pos-maxm, (3) pos-ref-max, (4) pos-ref-maxm, (5) ref-neg-max, (6) pos-neg-max
 Net:add(nn.FlattenTable())
 
 -- make 4 output tables of tables
@@ -243,7 +243,7 @@ maxBwd:add(maxBwdSel)
 milFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
 milFwdSel:add(nn.SelectTable(5))  -- ref-neg-max
 milBwdSel:add(nn.SelectTable(3))  -- pos-ref-max
-milBwdSel:add(nn.SelectTable(6))  -- ref-neg-max
+milBwdSel:add(nn.SelectTable(6))  -- pos-neg-max
 maxFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
 maxFwdSel:add(nn.SelectTable(2))  -- ref-pos-maxm
 maxBwdSel:add(nn.SelectTable(3))  -- ref-pos-max
@@ -262,100 +262,108 @@ return Net, criterion
 end
 
 function netWrapper.getMilMax(img_w, disp_max, hpatch, loss_margin, fnet)
-  
+
 local fNetRef = fnet:clone();
  
 local Net = nn.Sequential()
 
 -- pass 3 epipolar lines through feature net and normalize outputs
-local parFeatureNet = nn.ParallelTable()
-Net:add(parFeatureNet)
+local fNets = nn.ParallelTable()
+Net:add(fNets)  -- parallel feature nets
 fNetRef:add(nn.Squeeze(2))
 fNetRef:add(nn.Transpose({1,2}))
 fNetRef:add(nn.Normalize(2))
 local fNetPos = fNetRef:clone('weight','bias', 'gradWeight','gradBias');
 local fNetNeg = fNetRef:clone('weight','bias', 'gradWeight','gradBias');
-parFeatureNet:add(fNetRef)
-parFeatureNet:add(fNetPos)
-parFeatureNet:add(fNetNeg)
+fNets:add(fNetRef)
+fNets:add(fNetPos)
+fNets:add(fNetNeg)
 
 -- compute 3 cross products: ref and pos, ref and neg, pos and neg
-local commutator1Net = nn.ConcatTable()
-Net:add(commutator1Net);
-local seqRefPos = nn.Sequential()
-local seqRefNeg = nn.Sequential()
-local seqPosNeg = nn.Sequential()
-commutator1Net:add(seqRefPos)
-commutator1Net:add(seqRefNeg)
-commutator1Net:add(seqPosNeg)
-local selectorRefPos = nn.ConcatTable()
-local selectorRefNeg = nn.ConcatTable()
-local selectorPosNeg = nn.ConcatTable()
-seqRefPos:add(selectorRefPos)
-seqRefNeg:add(selectorRefNeg)
-seqPosNeg:add(selectorPosNeg)
-selectorRefPos:add(nn.SelectTable(1))
-selectorRefPos:add(nn.SelectTable(2))
-selectorRefNeg:add(nn.SelectTable(1))
-selectorRefNeg:add(nn.SelectTable(3))
-selectorPosNeg:add(nn.SelectTable(2))
-selectorPosNeg:add(nn.SelectTable(3))
-seqRefPos:add(nn.MM(false, true))
-seqRefNeg:add(nn.MM(false, true))
-seqPosNeg:add(nn.MM(false, true))
+local fNets2dNetCom = nn.ConcatTable()
+Net:add(fNets2dNetCom); -- feature net to distance net commutator
+local dNetRefPos_ = nn.Sequential()
+local dNetRefNeg = nn.Sequential()
+local dNetNegPos = nn.Sequential()
+fNets2dNetCom:add(dNetRefPos_)
+fNets2dNetCom:add(dNetRefNeg)
+fNets2dNetCom:add(dNetNegPos)
+local dNetRefPosSel = nn.ConcatTable()  -- input selectors for each distance net
+local dNetRefNegSel = nn.ConcatTable()
+local dNetNegPosSel = nn.ConcatTable()
+dNetRefPos_:add(dNetRefPosSel)
+dNetRefNeg:add(dNetRefNegSel)
+dNetNegPos:add(dNetNegPosSel)
+dNetRefPosSel:add(nn.SelectTable(1))
+dNetRefPosSel:add(nn.SelectTable(2))
+dNetRefNegSel:add(nn.SelectTable(1))
+dNetRefNegSel:add(nn.SelectTable(3))
+dNetNegPosSel:add(nn.SelectTable(3))
+dNetNegPosSel:add(nn.SelectTable(2))
+dNetRefPos_:add(nn.MM(false, true))
+dNetRefNeg:add(nn.MM(false, true))
+dNetNegPos:add(nn.MM(false, true))
 
--- make 2 streams: forward and backward cost
-local commutator2Net = nn.ConcatTable()
-Net:add(commutator2Net)
-local seqRefPosRefNeg = nn.Sequential()
-local seqRefPosPosNeg = nn.Sequential()
-commutator2Net:add(seqRefPosRefNeg)
-commutator2Net:add(seqRefPosPosNeg)
-local selectorRefPosRefNeg = nn.ConcatTable()
-seqRefPosRefNeg:add(selectorRefPosRefNeg) 
-local selectorRefPosPosNeg = nn.ConcatTable()
-seqRefPosPosNeg:add(selectorRefPosPosNeg) 
-selectorRefPosRefNeg:add(nn.SelectTable(1))
-selectorRefPosRefNeg:add(nn.SelectTable(2))
-selectorRefPosPosNeg:add(nn.SelectTable(1))
-selectorRefPosPosNeg:add(nn.SelectTable(3))
-
--- compute forward output
-local parRefPosRefNeg = nn.ParallelTable()
-seqRefPosRefNeg:add(parRefPosRefNeg)
-local seqRefPosMask = nn.Sequential()
-local seqRefNegMask = nn.Sequential()
-parRefPosRefNeg:add(seqRefPosMask)
-parRefPosRefNeg:add(seqRefNegMask)
+-- mask distance matrices to leave only valid disparities
+-- Basically we substract 2 from elements that should be ignored.
+-- In this way we make these elements much smaller than other elements.
 local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
 mask = torch.triu(torch.tril(mask,-1),-disp_max)
-mask = mask - 2;
-seqRefNegMask:add(nn.addMatrix(mask))
-seqRefPosMask:add(nn.addMatrix(mask))
-seqRefPosMask:add(nn.Narrow(1,disp_max+1, img_w - 2*hpatch - disp_max))
-seqRefNegMask:add(nn.Narrow(1,disp_max+1, img_w - 2*hpatch - disp_max))
-seqRefNegMask:add(nn.Max(2))  
-seqRefPosMask:add(nn.Max(2))  
-  
--- compute backward output
-local parRefPosPosNeg = nn.ParallelTable()
-seqRefPosPosNeg:add(parRefPosPosNeg)
-local seqRefPosMask = nn.Sequential()
-local seqPosNegMask = nn.Sequential()
-parRefPosPosNeg:add(seqRefPosMask)
-parRefPosPosNeg:add(seqPosNegMask)
-seqPosNegMask:add(nn.Transpose({1,2}))
-local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
-mask = torch.triu(torch.tril(mask,-1),-disp_max)
-mask = mask - 2;
-seqPosNegMask:add(nn.addMatrix(mask))
-seqRefPosMask:add(nn.addMatrix(mask))
-seqRefPosMask:add(nn.Narrow(2,1, img_w - 2*hpatch - disp_max))
-seqPosNegMask:add(nn.Narrow(2,1, img_w - 2*hpatch - disp_max))
-seqRefPosMask:add(nn.Transpose({1,2}))
-seqPosNegMask:add(nn.Transpose({1,2}))
-seqPosNegMask:add(nn.Max(2))  
-seqRefPosMask:add(nn.Max(2)) 
+mask = mask - 2; 
+dNetRefPos_:add(nn.addMatrix(mask))
+dNetRefNeg:add(nn.addMatrix(mask))
+dNetNegPos:add(nn.addMatrix(mask))
+
+-- make 2 copies of refPos distance matrix, since we use will use it twice 
+-- as ref-pos and pos-ref
+dNetRefPos_:add(nn.Replicate(2))
+dNetRefPos_:add(nn.SplitTable(1))
+local dNetRefPosSpl_ = nn.ParallelTable() -- splitter for ref-pos distance matrix
+dNetRefPos_:add(dNetRefPosSpl_)
+local dNetRefPos = nn.Sequential()
+local dNetPosRef = nn.Sequential()
+dNetRefPosSpl_:add(dNetRefPos)
+dNetRefPosSpl_:add(dNetPosRef)
+
+-- now cut parts of distance matrices, that correspond to edges of the image
+-- since on the edges of the image we might not have correct matches
+-- ref-neg table we cut from the top, and take max along 2 dim
+dNetRefNeg:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
+-- neg-pos table we cut from the right, transpose and take max along 2 dim
+dNetNegPos:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
+dNetNegPos:add(nn.Transpose{1,2})
+-- ref-pos we cut from the top
+dNetRefPos:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
+-- second copy of ref-pos we cut from the right and transpose to obtain pos-ref
+dNetPosRef:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
+dNetPosRef:add(nn.Transpose{1,2})
+
+-- compute row-wise maximums
+dNetRefPos:add(nn.Max(2))
+dNetRefNeg:add(nn.Max(2))
+dNetPosRef:add(nn.Max(2))
+dNetNegPos:add(nn.Max(2))
+
+-- flatten tables hierarchy
+-- after flattening, order is following 
+-- ref-pos-max, pos-ref-max, ref-neg-max, pos-neg-max
+Net:add(nn.FlattenTable())
+
+-- make 2 output tables of tables
+local dNet2CostCom = nn.ConcatTable()
+Net:add(dNet2CostCom); -- feature net to distance net commutator
+local milFwd = nn.Sequential()
+local milBwd = nn.Sequential()
+dNet2CostCom:add(milFwd)
+dNet2CostCom:add(milBwd)
+local milFwdSel = nn.ConcatTable()  -- input selectors for cost
+local milBwdSel = nn.ConcatTable()
+milFwd:add(milFwdSel)
+milBwd:add(milBwdSel)
+milFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
+milFwdSel:add(nn.SelectTable(3))  -- ref-neg-max
+milBwdSel:add(nn.SelectTable(2))  -- pos-ref-max
+milBwdSel:add(nn.SelectTable(4))  -- pos-neg-max
 
 local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);

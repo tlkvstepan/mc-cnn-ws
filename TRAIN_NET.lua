@@ -37,7 +37,7 @@ cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
 
 -- debug
-cmd:option('-debug_fname', 'test-contrast-max')
+cmd:option('-debug_fname', 'test')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_start_from_timestamp', '')
@@ -59,7 +59,7 @@ require 'nn'
 -- Custom modules
 dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to the input (I use it for masking purposes)
 
-require 'libdprog'                      -- C++ module for dynamic programming
+require 'libdprog'                        -- C++ module for dynamic programming
 dofile('CDprog.lua');                     -- Dynamic programming module
 dofile('CContrastDprog.lua');             -- Contrastive dynamic programming module
 dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
@@ -68,7 +68,7 @@ dofile('DataLoader.lua');                 -- Parent class for dataloaders
 dofile('CUnsup3EpiSet.lua');              -- Unsupervised training set loader
 dofile('CSup1Patch1EpiSet.lua');          -- Supervised validation set loader
 
-baseNet = dofile('CBaseNet.lua');        -- Function that makes base net
+baseNet = dofile('CBaseNet.lua');         -- Function that makes base net
 netWrapper = dofile('CNetWrapper.lua')    -- Function that "wrap" base net into training net
 testFun = dofile('CTestFun.lua');         -- Function that performs test on validation set
 
