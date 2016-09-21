@@ -232,7 +232,7 @@ function sup1Patch1EpiSet:index(indices, inputs, targets)
     local epi = self:get_epi(id, self.img2_arr)
     local inputs = {patch, epi}
     
-    local targets = 1 + self.disp_max - self:get_disp(id, self.disp_arr) -- not considering convolution
+    local targets = -self:get_disp(id, self.disp_arr) + 1 + self.disp_max -- not considering convolution
           
    return inputs, targets
 end
