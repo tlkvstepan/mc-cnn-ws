@@ -17,16 +17,15 @@
 *9. Implement mil dprog
 
 -- 21.09
-1. black on white for distance matrix
-1. make test net function
-2. test set is 2 epipolar lines (use all points with known gt) 
-3. draw actual epipolar line profile (or points)
-4. make compare net matlab function
-5. make visualize train matlab function
-6. prepare for experiments with middlebury dataset
-7. tune stereo pipeline with best of our nets (1000 random parameters samples)
-8. compare best of our net with supervised
-9. make equi-performance curve on our test set (for best of our nets and supervised)    
+*1. make test net function
+1. fix mil-dprog
+2. improve dprog function (evaluate once)
+3. test set from 2 epipolar lines (use all points with known gt) 
+4. draw actual epipolar line profile (or points)
+5. prepare for experiments with middlebury dataset
+6. tune stereo pipeline with best of our nets (1000 random parameters samples)
+7. compare best of our net with supervised
+8. make equi-performance curve on our test set (for best of our nets and supervised)    
     
 
 % ideas
