@@ -373,7 +373,7 @@ return Net, criterion
 
 end
 
-function netWrapper.getDistNet(fnet)
+function netWrapper.getDistNet(img_w, disp_max, hpatch, fnet)
 
 local fNetRef = fnet:clone()
 local Net = nn.Sequential()
@@ -390,6 +390,14 @@ parFeatureNet:add(fNetPos)
 -- compute cross products ref and pos
 Net:add(nn.MM(false, true))
 
+-- mask impossible disparity values in distance mask)
+-- (so that all impossible values are equal to -1)
+local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
+mask = torch.triu(torch.tril(mask,-1),-disp_max)
+mask = mask - 2; 
+Net:add(nn.addMatrix(mask))
+Net:add(nn.Clamp(-1, 1))
+   
 return Net
 
 end

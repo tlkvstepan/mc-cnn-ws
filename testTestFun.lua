@@ -1,23 +1,29 @@
 require 'nn'
-require 'cunn'
+require 'gnuplot'
+gnuplot.setterm('x11')
 
-mcCnnFst = dofile('CMcCnnFst.lua')
+mcCnnFst = dofile('CBaseNet.lua')
+netWrapper = dofile('CNetWrapper.lua')
 testFun = dofile('CTestFun.lua')
 
+dofile('CAddMatrix.lua')
 dofile('DataLoader.lua');
-dofile('CSup1Patch1EpiSet.lua');
+dofile('CSup2EpiSet.lua');
 utils = dofile('utils.lua')
 
 local img1_arr = torch.squeeze(utils.fromfile('data/KITTI12/x0.bin')):float();
 local img2_arr = torch.squeeze(utils.fromfile('data/KITTI12/x1.bin')):float();
 local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.bin'))):float();
- hpatch = 4
- 
-local set = sup1Patch1EpiSet(img1_arr[{{1,3},{},{}}], img2_arr[{{1,3},{},{}}], disp_arr[{{1,3},{},{}}], hpatch);
+local hpatch = 4
+local disp_max = disp_arr:max()
+local img_w = img1_arr:size(3);
+
+local set = sup2EpiSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
 set:shuffle()
 
-fnet, hpatch = mcCnnFst.get(4, 64, 3)
-  
-input, target = set:index(torch.range(1, 1000))
+net = torch.load('fnet_2016_09_22_13:39:10_contrast-dprog.t7', 'ascii')
+distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, net)
 
-acc_lt3, acc_lt5, errCases = testFun.epiEval(fnet:cuda(), {input[1]:cuda(), input[2]:cuda()}, target:cuda())
+input, target = set:index(torch.range(1, 100))
+
+acc_lt3, acc_lt5, errCases = testFun.epiEpiEval(distNet, {input[1], input[2]}, target)

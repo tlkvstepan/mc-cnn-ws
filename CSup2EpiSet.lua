@@ -58,15 +58,18 @@ function sup2EpiSet:get_gt(id, disp)
   -- given id(s) returns true disparities
   
   local pair, row =  self:id_2_pair_row(id);
-  local mask_uncomputable = torch.range(1, self.img_w):gt(self.disp_max)  
-  local gt = torch.Tensor(id:numel(), 1, self.img_w)
+  local mask_uncomputable = torch.range(1, self.img_w):le(self.disp_max)  
+  local mask_bound = torch.range(1, self.img_w):gt(self.hpatch):cmul(torch.range(1, self.img_w):le(self.img_w - self.hpatch))
+  local gt = torch.Tensor(id:numel(), 1, self.img_w-2*self.hpatch)
   
   for n = 1, id:numel() do
       -- we keep data in float, but when queried convert to double 
-      local epi_disp = disp[{{pair[n]},{row[n]},{}}]:double()
-      local mask_unknown = epi_disp:ge(0.5)
-      local mask = mask_unknown:cmul(mask_uncomputable)
-      epi_disp[mask] = 1/0
+      local epi_disp = disp[{{pair[n]},{row[n]},{}}]:squeeze():double()
+      local mask_unknown = epi_disp:le(0.5)
+      local mask = mask_uncomputable + mask_unknown
+      mask = mask:gt(0)
+      epi_disp[mask] = -1;
+      epi_disp = epi_disp[mask_bound] 
       gt[{{n},{}}] = epi_disp
   end
   
