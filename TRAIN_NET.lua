@@ -19,12 +19,13 @@ require 'torch'
 arch = table.remove(arg, 1) 
 cmd = torch.CmdLine()
 
+arch = 'mil-max'
 assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
-cmd:option('-valid_set_size', 50000)       
+cmd:option('-valid_set_size', 350)       
 cmd:option('-train_batch_size', 1024)     
-cmd:option('-train_epoch_size', 100*1024) 
+cmd:option('-train_epoch_size', 1024*100) 
 cmd:option('-train_nb_epoch', 300)        
 
 -- training network parameters
@@ -37,8 +38,9 @@ cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
 
 -- debug
+cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
-cmd:option('-debug_gpu_on', true)
+cmd:option('-debug_gpu_on', false)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_start_from_timestamp', '')
 
@@ -66,11 +68,11 @@ dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
 
 dofile('DataLoader.lua');                 -- Parent class for dataloaders
 dofile('CUnsup3EpiSet.lua');              -- Unsupervised training set loader
-dofile('CSup1Patch1EpiSet.lua');          -- Supervised validation set loader
+dofile('CSup2EpiSet.lua');          -- Supervised validation set loader
 
 baseNet = dofile('CBaseNet.lua');         -- Function that makes base net
 netWrapper = dofile('CNetWrapper.lua')    -- Function that "wrap" base net into training net
-testFun = dofile('CTestFun.lua');         -- Function that performs test on validation set
+testFun = dofile('CTestUtils.lua');         -- Function that performs test on validation set
 
 utils = dofile('utils.lua');              -- Utils for loading and visualization
 
@@ -142,7 +144,7 @@ _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 -- |define datasets|
 
 local unsupSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
-local supSet = sup1Patch1EpiSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
+local supSet = sup2EpiSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
 supSet:shuffle()  -- shuffle to have patches from all images
 
 -- get validation set from supervised set
@@ -207,8 +209,7 @@ end
 if prm['debug_save_on'] then
   logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
   logger:setNames{'Training loss', 
-    '<3 disparity error', 
-    '<5 disparity error'}
+    '<3 disparity accuracy'}
   logger:style{'+-',
     '+-',
     '+-'}
@@ -249,8 +250,12 @@ end
 train_err = torch.Tensor(sample_err):mean();
 
 -- validation
-_BASE_PPARAM_:copy(_TR_PPARAM_) -- copy parameters of network to basenet
-local test_acc_lt3, test_acc_lt5, errCases = testFun.epiEval(_BASE_FNET_, _VA_INPUT_, _VA_TARGET_)
+_BASE_PPARAM_:copy(_TR_PPARAM_)
+local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:double())
+if prm['debug_gpu_on'] then
+  distNet:cuda()
+end
+local test_acc_lt3, errCases = testFun.getTestAcc(distNet, _VA_INPUT_, _VA_TARGET_, prm['debug_err_th'])
 
 local end_time = os.time()
 local time_diff = os.difftime(end_time,start_time);
@@ -276,25 +281,31 @@ if prm['debug_save_on'] then
   torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
 
   -- save log
-  logger:add{train_err, test_acc_lt3, test_acc_lt5}
+  logger:add{train_err, test_acc_lt3}
   logger:plot()
 
   -- save distance matrices
-  local lines = {290,433}
+  local lines = {3,9}
   for nline = 1,#lines do
-    local input = unsupSet:index(torch.Tensor{lines[nline]})
-    local valid_net = netWrapper.getDistNet(_BASE_FNET_)
-    if  prm['debug_gpu_on'] then
-      valid_net:cuda()
-      input[1] = input[1]:cuda()
-      input[2] = input[2]:cuda();
-      input[3] = input[3]:cuda();
-   end
-   local refPos = valid_net:forward(input):float();
-   refPos = utils.mask(refPos,disp_max)
-   refPos = utils.softmax(refPos)
-   refPos = utils.scale2_01(refPos)
-   image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',refPos)
+    
+    local distMat, gtDistMat = testFun.getDist(distNet, {_VA_INPUT_[1][{{lines[nline]},{},{}}], _VA_INPUT_[2][{{lines[nline]},{},{}}]}, _VA_TARGET_[{{lines[nline]},{},{}}], prm['debug_err_th'])
+
+    local gtDistMat = 1-utils.scale2_01(gtDistMat)
+
+    local distMat = utils.softmax(distMat:squeeze())
+    local distMat = 1-utils.scale2_01(distMat)
+
+    local r = distMat:clone()
+    local g = distMat:clone()
+    local b = distMat:clone()
+
+    r[gtDistMat:eq(0)] = 0 
+    g[gtDistMat:eq(0)] = 1
+    b[gtDistMat:eq(0)] = 0
+
+    im = torch.cat({nn.utils.addSingletonDimension(r,1), nn.utils.addSingletonDimension(g,1), nn.utils.addSingletonDimension(b,1)}, 1)
+   
+   image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',im)
   end
 end
 

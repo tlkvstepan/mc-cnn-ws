@@ -58,13 +58,16 @@ function sup2EpiSet:get_gt(id, disp)
   -- given id(s) returns true disparities
   
   local pair, row =  self:id_2_pair_row(id);
-  local mask_uncomputable = torch.range(1, self.img_w):le(self.disp_max)  
-  local mask_bound = torch.range(1, self.img_w):gt(self.hpatch):cmul(torch.range(1, self.img_w):le(self.img_w - self.hpatch))
+  local col = torch.range(1, self.img_w)
+  local mask_computable = col:gt(self.hpatch):cmul(col:le(self.img_w - self.hpatch))
+  local mask_bound = col:gt(self.hpatch):cmul(col:le(self.img_w - self.hpatch))
   local gt = torch.Tensor(id:numel(), 1, self.img_w-2*self.hpatch)
   
   for n = 1, id:numel() do
       -- we keep data in float, but when queried convert to double 
       local epi_disp = disp[{{pair[n]},{row[n]},{}}]:squeeze():double()
+      local mask_computable_ = mask_computable:clone():cmul((epi_disp+self.hpatch):lt(col))
+      local mask_uncomputable = -mask_computable_ + 1
       local mask_unknown = epi_disp:le(0.5)
       local mask = mask_uncomputable + mask_unknown
       mask = mask:gt(0)
@@ -105,18 +108,30 @@ function sup2EpiSet:get_valid_id()
    
   ]]--
   
-    local row = torch.range(1, self.img_h);
-    local mask_bound = row:ge(self.hpatch + 1)
-    mask_bound = mask_bound:cmul(row:le(self.img_h - self.hpatch))
+    local x = torch.range(1, self.img_w);
+    x = x:view(1,x:numel()):clone();
+    local y = torch.range(1, self.img_h);
+    y = y:view(y:numel(),1):clone();
+    local xx = torch.repeatTensor(x,y:size(1),1);
+    local yy = torch.repeatTensor(y,1,x:size(2));
+    
+    local mask_computable = xx:gt(self.hpatch)
+    mask_computable = mask_computable:cmul(xx:le(self.img_w - self.hpatch))
+    mask_computable = mask_computable:cmul(yy:le(self.img_h - self.hpatch))
+    mask_computable = mask_computable:cmul(yy:gt(self.hpatch))
     
     local id = {}
     for npair = 1,self.nb_pairs do
       
       local disp = torch.squeeze(self.disp_arr[{{npair},{},{}}]):double();
-      local mask_nodisp = torch.max(disp, 2):ge(0.5)
+      local mask_computable_ = mask_computable:clone():cmul((disp+self.hpatch):lt(xx))
+      local mask_unknown = disp:le(0.5)
       
-      local mask = mask_nodisp:cmul(mask_bound)
-      local active_row = row[mask]:clone()
+      local mask_known = 1-mask_unknown;
+      
+      local mask = mask_known:cmul(mask_computable_)
+      local mask = mask:max(2):gt(0)
+      local active_row = torch.range(1,self.img_h)[mask]:clone()
       
       id[npair] = self:pair_row_2_id(npair, active_row);
     
