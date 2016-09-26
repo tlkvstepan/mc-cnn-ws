@@ -19,14 +19,13 @@ require 'torch'
 arch = table.remove(arg, 1) 
 cmd = torch.CmdLine()
 
-arch = 'mil-max'
 assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
-cmd:option('-valid_set_size', 350)       
-cmd:option('-train_batch_size', 1024)     
-cmd:option('-train_epoch_size', 1024*100) 
-cmd:option('-train_nb_epoch', 300)        
+cmd:option('-valid_set_size', 100)       
+cmd:option('-train_batch_size', 342)      -- one image in KITTI
+cmd:option('-train_epoch_size', 342*389)  -- all images in KITTI
+cmd:option('-train_nb_epoch', 100)        -- 100 times all images in KITTI
 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
@@ -40,7 +39,7 @@ cmd:option('-net_nb_layers', 4)
 -- debug
 cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
-cmd:option('-debug_gpu_on', false)
+cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_start_from_timestamp', '')
 
@@ -209,7 +208,7 @@ end
 if prm['debug_save_on'] then
   logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
   logger:setNames{'Training loss', 
-    '<3 disparity accuracy'}
+    'Accuracy (<3 disparity err)'}
   logger:style{'+-',
     '+-',
     '+-'}
@@ -251,7 +250,7 @@ train_err = torch.Tensor(sample_err):mean();
 
 -- validation
 _BASE_PPARAM_:copy(_TR_PPARAM_)
-local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:double())
+local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
 if prm['debug_gpu_on'] then
   distNet:cuda()
 end

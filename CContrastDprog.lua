@@ -1,10 +1,11 @@
 
 --[[
-  Given h x w tensor as an _input_, module outputs table with two tensors: _rowDynProg_ and _rowMax_
+  Given h x w tensor as an _input_, module outputs 4 x h tensor
     
-    _rowDynProg_ is h tensor, that consists row wise dynamic programming solutions 
-    _rowMax_ is h tensor, that consists of row-wise maximums that are no closer to 
-      the first maximum than _distMin_
+    first column  - fDprog
+    second column - fMax
+    third column  - bDprog
+    forth column  - bMax
 
 --]]
 
@@ -14,8 +15,10 @@ function contrastDprog:__init(distMin)
    parent.__init(self)
    self.distMin = distMin
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
-   self._indicesDynProg = torch.Tensor()
-   self._indicesMax = torch.Tensor()
+   self.fDprogIndices = torch.Tensor()
+   self.fMaxIndices   = torch.Tensor()
+   self.bDprogIndices = torch.Tensor()
+   self.bMaxIndices   = torch.Tensor()
 end
 
 function contrastDprog:updateOutput(input)
@@ -23,14 +26,18 @@ function contrastDprog:updateOutput(input)
   local _input = input:clone():double()
   local _outputDynProg = torch.Tensor(input:size(1),1)
    
-   -- compute dynamic programming solution 
-  local aE =  torch.FloatTensor(input:size(1),input:size(2))
-  local aP =  torch.FloatTensor(input:size(1),input:size(2))
-  self._indicesDynProg = torch.FloatTensor(input:size(1))
-  local _outputDynProg =  torch.FloatTensor(input:size(1))
-
-  dprog.compute(input:float(), aE, aP, self._indicesDynProg, _outputDynProg);
+  -- compute dynamic programming solution 
+  local path = torch.clone(input):zero():float()
+  local fDprogCost = torch.zeros(input:size(1)):float()
+  local bDprogCost = torch.zeros(input:size(1)):float()
+  self.fDprogIndices = torch.zeros(input:size(1)):float()
+  self.bDprogIndices = torch.zeros(input:size(1)):float()
   
+  dprog.compute(input, path, fDprogCost, bDprogCost, self.fDprogIndices, self.bDprogIndices);
+
+
+
+
   _outputDynProg=_outputDynProg:double()
 
   self._indicesDynProg = nn.utils.addSingletonDimension(self._indicesDynProg:long(),2)

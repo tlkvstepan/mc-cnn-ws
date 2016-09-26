@@ -1,17 +1,15 @@
 require 'libdprog'
 require 'gnuplot'
 
-local E = torch.rand(30,50):float()
-local aE =  torch.zeros(30,50):float()
-local aP = torch.zeros(30,50):float()
-local aS = torch.zeros(30,50):float()
-local T = torch.zeros(30,50):float()
+local E = torch.rand(5,5):float()
+local path = torch.zeros(5,5):float()
+costRef2pos = torch.Tensor(5):float()
+costPos2ref = torch.Tensor(5):float()
+indexRef2pos = torch.Tensor(5):float()
+indexPos2ref = torch.Tensor(5):float()
 
-indices = torch.Tensor(30):float()
-values = torch.Tensor(30):float()
-
-dprog.compute(E, aE, aS, aP, T);
+dprog.compute(E, path, costRef2pos, costPos2ref, indexRef2pos, indexPos2ref);
 gnuplot.imagesc(E,'color')
 gnuplot.figure()
-gnuplot.imagesc(T,'color')
-print(T)
+gnuplot.imagesc(path,'color')
+print(path)

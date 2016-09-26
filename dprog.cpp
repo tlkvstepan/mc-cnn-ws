@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include <limits>
+#include <cmath>
 #include <algorithm>    //min
 
 #include <stdio.h>
@@ -26,7 +27,9 @@ void trace(float *aE, float *aS, float *aP, float *T, int w, int h)
   int maxcol = 0;
   for( int ncol = 1; ncol < w; ++ncol )
   {
-    if( aE[SUB2IND_2D_TORCH(maxcol, h-1, w, h)] / aS[SUB2IND_2D_TORCH(maxcol, h-1, w, h)]  < aE[SUB2IND_2D_TORCH(ncol, h-1, w, h)] / aS[SUB2IND_2D_TORCH(ncol, h-1, w, h)] ) maxcol = ncol; 
+    
+    if( aE[SUB2IND_2D_TORCH(maxcol, h-1, w, h)] / aS[SUB2IND_2D_TORCH(maxcol, h-1, w, h)]  < 
+        aE[SUB2IND_2D_TORCH(ncol, h-1, w, h)] / aS[SUB2IND_2D_TORCH(ncol, h-1, w, h)] ) maxcol = ncol; 
   }
   
   // propogate best energy back
@@ -40,7 +43,7 @@ void trace(float *aE, float *aS, float *aP, float *T, int w, int h)
   
 }
 
-void accumulate(const float *E, float *accE, float* S, float *P, int w, int h)
+void accumulate(const float *E, float *aE, float* aS, float *traceBack, int w, int h)
 {
 
   /*
@@ -50,9 +53,10 @@ void accumulate(const float *E, float *accE, float* S, float *P, int w, int h)
   Step down and right correspond to occlusion and incur occlusion penalty.
   Step down-righ incur matching cost 
     
-  aE - cost of best path to current cell	
-  P  - index of previous cell 
-  S  - number of steps along 
+  E  - energy of each cell  
+  aE - energy of best path to cell	
+  traceBack  - index of previous cell 
+  aS  - number of steps along best path to cell
   
   */
   
@@ -64,9 +68,9 @@ void accumulate(const float *E, float *accE, float* S, float *P, int w, int h)
   // initialize top row
   for( int ncol = 0; ncol < w; ++ncol ){
   	int idx = SUB2IND_2D_TORCH(ncol, 0, w, h); 
-    accE[idx] = E[idx];
-    P[idx] = -1;
-    S[idx] = 1;
+    aE[idx] = E[idx];
+    traceBack[idx] = -1;
+    aS[idx] = 1;
   }   
   
   // go from top row down, computing best accumulated energy in every position 
@@ -78,17 +82,17 @@ void accumulate(const float *E, float *accE, float* S, float *P, int w, int h)
     curIdx = SUB2IND_2D_TORCH(0, nrow, w, h);
     prevIdx = SUB2IND_2D_TORCH(0, nrow - 1, w, h);
     
-    if( E[curIdx] > (accE[prevIdx] + E[curIdx]) / (S[prevIdx] + 1) )
+    if( E[curIdx] > (aE[prevIdx] + E[curIdx]) / (aS[prevIdx] + 1) )
     {
       // we start here
-      accE[curIdx] = E[curIdx];
-      P[curIdx] = -1;
-      S[curIdx] = 1;
+      aE[curIdx] = E[curIdx];
+      traceBack[curIdx] = -1;
+      aS[curIdx] = 1;
     }else{
       // we came from top
-      accE[curIdx] = E[curIdx] + accE[prevIdx];
-      P[curIdx] = prevIdx;
-      S[curIdx] = S[prevIdx] + 1;
+      aE[curIdx] = E[curIdx] + aE[prevIdx];
+      traceBack[curIdx] = prevIdx;
+      aS[curIdx] = aS[prevIdx] + 1;
     }
     
    
@@ -107,12 +111,12 @@ void accumulate(const float *E, float *accE, float* S, float *P, int w, int h)
       
         prevIdx = SUB2IND_2D_TORCH(ncol + dx[nneig], nrow + dy[nneig], w, h);
         
-        float curE = accE[prevIdx];
+        float curE = aE[prevIdx];
         
         if( nneig == 2 ) curE += E[curIdx];  // if add match energy
         
         // compute average energy
-        float curS = S[prevIdx] + 1;
+        float curS = aS[prevIdx] + 1;
         float avgE = curE / curS;
         
         if( bestPrevIdx == -1 || bestAvgE < avgE ) 
@@ -125,11 +129,10 @@ void accumulate(const float *E, float *accE, float* S, float *P, int w, int h)
        
     	}	
       
-      accE[curIdx] = bestE;
-      P[curIdx] = bestPrevIdx;
-      S[curIdx] = bestS;
-     
-      
+      aE[curIdx] = bestE;
+      traceBack[curIdx] = bestPrevIdx;
+      aS[curIdx] = bestS;
+           
     }
     
   }    
@@ -139,44 +142,66 @@ void accumulate(const float *E, float *accE, float* S, float *P, int w, int h)
 
 int compute(lua_State *L)
 {
-   
+    // input
     THFloatTensor *E_ = (THFloatTensor*)luaT_checkudata(L, 1, "torch.FloatTensor");
-    THFloatTensor *aE_ = (THFloatTensor*)luaT_checkudata(L, 2, "torch.FloatTensor");
-    THFloatTensor *aS_ = (THFloatTensor*)luaT_checkudata(L, 3, "torch.FloatTensor");
-    THFloatTensor *aP_ = (THFloatTensor*)luaT_checkudata(L, 4, "torch.FloatTensor");
-
-    THFloatTensor *T_ = (THFloatTensor*)luaT_checkudata(L, 5, "torch.FloatTensor");
-  //  THFloatTensor *values_ = (THFloatTensor*)luaT_checkudata(L, 6, "torch.FloatTensor");
+    
+    // output
+    THFloatTensor *pathOpt_  = (THFloatTensor*)luaT_checkudata(L, 2, "torch.FloatTensor");
+    THFloatTensor *costRef2Pos_ = (THFloatTensor*)luaT_checkudata(L, 3, "torch.FloatTensor");
+    THFloatTensor *costPos2Ref_ = (THFloatTensor*)luaT_checkudata(L, 4, "torch.FloatTensor");
+    THFloatTensor *indexRef2Pos_ = (THFloatTensor*)luaT_checkudata(L, 5, "torch.FloatTensor");
+    THFloatTensor *indexPos2Ref_ = (THFloatTensor*)luaT_checkudata(L, 6, "torch.FloatTensor");
 
     int w = THFloatTensor_size(E_, 1);
     int h = THFloatTensor_size(E_, 0);
-    
-    std::cout << "width " << w << "\n";   
-    std::cout << "height " << h << "\n";   
-    
+   
+    float *E = THFloatTensor_data(E_);                // Energy
+    float *pathOpt = THFloatTensor_data(pathOpt_);          // Optimal path
+    float *costRef2Pos = THFloatTensor_data(costRef2Pos_);      // Match cost (or -2 if no match)
+    float *costPos2Ref = THFloatTensor_data(costPos2Ref_);      // Match cost (or -2 if no match)
+    float *indexRef2Pos = THFloatTensor_data(indexRef2Pos_);      // Match cost (or -2 if no match)
+    float *indexPos2Ref = THFloatTensor_data(indexPos2Ref_);      // Match cost (or -2 if no match)
 
-    float *E = THFloatTensor_data(E_);
-    float *aE = THFloatTensor_data(aE_);
-    float *aS = THFloatTensor_data(aS_);
-    float *aP = THFloatTensor_data(aP_);
-    float *T = THFloatTensor_data(T_);
-  //  float *values = THFloatTensor_data(values_);
-
-    //std::cout << "height " << E[SUB2IND_2D_TORCH(3,2, w, h)] << "\n";   
-
-    //double *aE = new double[h*w];
-    //double *aP = new double[h*w];
+    float *aE = new float[w*h];
+    float *aSteps = new float[h*w];
+    float *traceBack = new float[h*w];
+        
+    accumulate(E, aE, aSteps, traceBack, w, h);
+    trace(aE, aSteps, traceBack, pathOpt, w, h);
     
-    accumulate(E, aE, aS, aP, w, h);
-    trace(aE, aS, aP, T, w, h);
- 
-   // for( int nrow = 0; nrow < h; ++nrow ){
-   //     values[nrow] = E[SUB2IND_2D_TORCH((int)indices[nrow], nrow, w, h)];
-   // }
+    int *sumCol = new int[w];
+    int *sumRow = new int[h];
+    for( int nrow = 0; nrow < h; ++nrow ){
+      for( int ncol = 0; ncol < w; ++ncol ){ 
+        int idx = SUB2IND_2D_TORCH(ncol, nrow, w, h);
+        sumCol[ncol] += pathOpt[idx];
+        sumRow[nrow] += pathOpt[idx];
+      }
+    }
     
-   // delete[] aE;
-   // delete[] aP;
-
+    // mark as occluded 
+    std::fill(costRef2Pos, costRef2Pos + w, HUGE_VALF);
+    std::fill(costPos2Ref, costPos2Ref + w, HUGE_VALF);
+    for( int nrow = 0; nrow < h; ++nrow ){
+      for( int ncol = 0; ncol < w; ++ncol ){ 
+        int idx = SUB2IND_2D_TORCH(ncol, nrow, w, h);
+        if( pathOpt[idx] == 1 )
+        {
+          if( sumCol[ncol] == 1 && sumRow[nrow] == 1 ){ // check if occluded 
+             costRef2Pos[nrow] = (float)E[idx];
+             costPos2Ref[ncol] = (float)E[idx];
+             indexRef2Pos[nrow] = ncol;
+             indexPos2Ref[ncol] = nrow;             
+          }
+        }
+      }
+    }
+    
+    delete[] aE;
+    delete[] aSteps;
+    delete[] traceBack;
+    delete[] sumCol;
+    delete[] sumRow;
     return 0;
 }
 
