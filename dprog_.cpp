@@ -4,8 +4,6 @@ extern "C" {
     #include "lauxlib.h"
 }
 
-#include <algorithm>    //min
-
 #include <stdio.h>
 
 #include <math.h>
@@ -34,76 +32,30 @@ void trace(float *aE, float *aP, float *T, int w, int h)
 
 }
 
-void accumulate(const float *E, float *aE, float* S, float *P, int w, int h)
+void accumulate(const float *E, float *aE, float *aP, int w, int h)
 {
 
-  /*
+  // this is analog of integral image for max operator for line:
+  // maxVal[i] is maximum value in [0, i]
+  // maxVal[i] is index value of the maximum value
+  float *maxIdx = new float[w];
+  float *maxVal = new float[w];
 
-  We start from right side of energy array and continue to the bottom.
-  Only steps down, down-right and right are allowed (we want to have continuous line).
-  
-  aE - cost of best path to current cell	
-  P  - index of previous cell 
-  S  - number of steps in best path to current cell
-
-  */
-  
-  // top, left, left-top
-  int dx[3] = { 0, -1, -1};
-  int dy[3] = {-1,  0, -1};
-  int nb_neig = 3;
-
-  // initialize top row
+  // initialize top row of accumulated energy to energy
   for( int ncol = 0; ncol < w; ++ncol ){
-  	int idx = SUB2IND_2D_TORCH(0, ncol, w, h); 
-    aE[idx] = E[idx];
-    P[idx] = 0;
-    S[idx] = 0;  
+    aE[SUB2IND_2D_TORCH(ncol, 0, w, h)] = E[SUB2IND_2D_TORCH(ncol, 0, w, h)];
+    aP[SUB2IND_2D_TORCH(ncol, 0, w, h)] = 0;  
   }   
   
   // go from top row down, computing best accumulated energy in every position 
   for( int nrow = 1; nrow < h; ++nrow) 
   {
     
-    curIdx = SUB2IND_2D_TORCH(nrow, 0, w, h);
-    topIdx = SUB2IND_2D_TORCH(nrow-1, 0, w, h);
+    maxIdx[0] = 0;
+    maxVal[0] = aE[SUB2IND_2D_TORCH(0, nrow-1, w, h)];
 
-    // to first cell of the row we can move only from:
-    // (1) top cell, or (2) we can start 
-    float startE = E[curIdx];
-    float fromTopE = (aE[topIdx] + E[curIdx]) / (S[topIdx] + 1)  
-    if startE > fromTopE  
-    {
-    	aE[curIdx] = E[curIdx]; 
-    	P[curIdx] = 0; 
-    	S[curIdx] = 1;
-    }else{
-    	aE[curIdx] = E[curIdx] + aE[topIdx];
-    	P[curIdx] = topIdx;
-    	S[curIdx] = S[topIdx] + 1;
-    }	
-
-    // to each cell we can arrive from left, top or left top 
     for( int ncol = 1; ncol < w; ++ncol )
     {
-    	curIdx = SUB2IND_2D_TORCH(nrow, ncol, w, h);
-    	for( int nneig = 0; nneig < nb_neig; ++nneigh )
-    	{
-    		prevIdx = SUB2IND_2D_TORCH(nrow + dy[nneig], ncol + dx[nneig], w, h);
-    	
-
-    	}	
-
-    	topIdx = SUB2IND_2D_TORCH(nrow-1, ncol, w, h);
-    	leftIdx = SUB2IND_2D_TORCH(nrow, ncol-1, w, h);
-		topLeftIdx = SUB2IND_2D_TORCH(nrow-1, ncol-1, w, h);
-
-    	float fromTopE 	= (aE[topIdx] + E[curIdx]) / (S[topIdx] + 1)  
-    	float fromLeftE = (aE[leftIdx] + E[curIdx]) / (S[leftIdx] + 1)  
-		float fromTopLeftE = (aE[topLeftIdx] + E[curIdx]) / (S[topLeftIdx] + 1)  
-
-		if fromTopE > fromLeftE
-			if
         int idx = SUB2IND_2D_TORCH(ncol, nrow-1, w, h);
         if( maxVal[ncol-1] < aE[idx] )
         { 

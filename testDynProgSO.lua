@@ -1,14 +1,17 @@
-require 'libdynprog'
+require 'libdprog'
 require 'gnuplot'
 
-local input = torch.rand(30,40):float()
-local aE =  torch.FloatTensor(30,40)
-local aP = torch.FloatTensor(30,40)
+local E = torch.rand(30,50):float()
+local aE =  torch.zeros(30,50):float()
+local aP = torch.zeros(30,50):float()
+local aS = torch.zeros(30,50):float()
+local T = torch.zeros(30,50):float()
 
 indices = torch.Tensor(30):float()
 values = torch.Tensor(30):float()
 
-dynprog.compute(input, aE, aP, indices, values);
-
-print(values)
-print(indices)
+dprog.compute(E, aE, aS, aP, T);
+gnuplot.imagesc(E,'color')
+gnuplot.figure()
+gnuplot.imagesc(T,'color')
+print(T)
