@@ -35,7 +35,7 @@ function testUtils.getDist(distNet, input, target, errTh)
   
   for nsample = 1, nb_samples do
 
-    local gtDisp = target[{{nsample}, {}}]:squeeze();
+    local gtDisp = target[{{nsample}, {}}]:double():squeeze();
     local rowCol = torch.add(row, -gtDisp) -- here we compute col indices in distance matrix 
     
     for nrow = 1, gtDisp:size(1) do
@@ -49,7 +49,7 @@ function testUtils.getDist(distNet, input, target, errTh)
     end
     
     local sample_input = {refEpi[{{nsample}, {}, {}}], posEpi[{{nsample}, {}, {}}]}
-    distMat[{{nsample},{},{}}] = distNet:forward(sample_input) 
+    distMat[{{nsample},{},{}}] = distNet:forward(sample_input):double() 
     
   end
   
@@ -115,10 +115,10 @@ function testUtils.getTestAcc(distNet, input, target, errTh)
   
   for nsample = 1, nb_samples do
 
-    local gtDisp      = target[{{nsample}, {}}]:squeeze();
+    local gtDisp      = target[{{nsample}, {}}]:double():squeeze();
     
     local sample_input = {refEpi[{{nsample}, {}, {}}], posEpi[{{nsample}, {}, {}}]}
-    local distMat = distNet:forward(sample_input) 
+    local distMat = distNet:forward(sample_input):double() 
     
     local val, wtaDisp = torch.max(distMat, 2)
     wtaDisp = wtaDisp:double()

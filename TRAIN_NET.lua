@@ -19,7 +19,6 @@ require 'torch'
 arch = table.remove(arg, 1) 
 cmd = torch.CmdLine()
 
-arch = 'mil-max'
 assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
@@ -40,7 +39,7 @@ cmd:option('-net_nb_layers', 4)
 -- debug
 cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
-cmd:option('-debug_gpu_on', false)
+cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_start_from_timestamp', '')
 
@@ -209,7 +208,7 @@ end
 if prm['debug_save_on'] then
   logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
   logger:setNames{'Training loss', 
-    '<3 disparity accuracy'}
+    'Accuracy (<3 disparity err)'}
   logger:style{'+-',
     '+-',
     '+-'}
@@ -251,7 +250,7 @@ train_err = torch.Tensor(sample_err):mean();
 
 -- validation
 _BASE_PPARAM_:copy(_TR_PPARAM_)
-local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:double())
+local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
 if prm['debug_gpu_on'] then
   distNet:cuda()
 end
