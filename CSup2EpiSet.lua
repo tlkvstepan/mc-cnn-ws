@@ -127,7 +127,7 @@ function sup2EpiSet:get_valid_id()
       local mask_computable_ = mask_computable:clone():cmul((disp+self.hpatch):lt(xx))
       local mask_unknown = disp:le(0.5)
       
-      local mask_known = 1-mask_unknown;
+      local mask_known = -mask_unknown + 1;
       
       local mask = mask_known:cmul(mask_computable_)
       local mask = mask:max(2):gt(0)
