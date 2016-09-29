@@ -580,31 +580,38 @@ parFeatureNet:add(fNetPos)
 
 -- compute cross products ref and pos
 Net:add(nn.MM(false, true))
-
+   
 -- mask wrong disparities
 local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
 mask = torch.triu(torch.tril(mask,-1),-disp_max)
 mask = mask - 2;
 Net:add(nn.addMatrix(mask))
 
--- make two streams : one with matrix and another with its transpose
-splitter = nn.ConcatTable()
-Net:add(splitter)
-stream1 = nn.Sequential()
-stream2 = nn.Sequential()
-splitter:add(stream1)
-splitter:add(stream2)
+-- clamp (-1, 1)
+Net:add(nn.Clamp(-1,1))
 
--- stream1 :
-stream1:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
-stream1:add(nn.contrastDprog(dist_min))
-stream1:add(nn.SplitTable(2))
+-- convert range to (0 -1)
+Net:add(nn.AddConstant(1))
+Net:add(nn.MulConstant(0.5))
 
--- stream2 :
-stream2:add(nn.Narrow(2,1, img_w - 2*hpatch - disp_max))
-stream2:add(nn.Transpose({1,2}))
-stream2:add(nn.contrastDprog(dist_min))
-stream2:add(nn.SplitTable(2))
+
+Net:add(nn.contrastDprog(dist_min))
+Net:add(nn.SplitTable(2))
+
+local NetCom = nn.ConcatTable()
+Net:add(NetCom); -- feature net to distance net commutator
+local NetFCost = nn.Sequential()
+local NetBCost = nn.Sequential()
+NetCom:add(NetFCost)
+NetCom:add(NetBCost)
+local NetFCostSel = nn.ConcatTable()  -- input selectors for each distance net
+local NetBCostSel = nn.ConcatTable()
+NetFCost:add(NetFCostSel)
+NetBCost:add(NetBCostSel)
+NetFCostSel:add(nn.SelectTable(1))
+NetFCostSel:add(nn.SelectTable(2))
+NetBCostSel:add(nn.SelectTable(1))
+NetBCostSel:add(nn.SelectTable(3))
 
 local contrastiveFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastiveBwdCst = nn.MarginRankingCriterion(loss_margin);

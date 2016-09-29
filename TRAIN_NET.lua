@@ -23,9 +23,9 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 
 -- optimization parameters parameters
 cmd:option('-valid_set_size', 100)       
-cmd:option('-train_batch_size', 342)      -- one image in KITTI
-cmd:option('-train_epoch_size', 342*389)  -- all images in KITTI
-cmd:option('-train_nb_epoch', 100)        -- 100 times all images in KITTI
+cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
+cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
+cmd:option('-train_nb_epoch', 35)        -- 100 times all images in KITTI
 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
@@ -41,7 +41,7 @@ cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
-cmd:option('-debug_start_from_timestamp', '')
+cmd:option('-debug_start_from', '')
 
 prm = cmd:parse(arg)
 prm['arch'] = arch
@@ -96,13 +96,12 @@ local img_w = img1_arr:size(3);
 
 -- |define test and training networks|
 -- If we choose to start from timestamp, when try to read pre-trained base feature net
-local fnet_fname = 'work/' .. prm['debug_fname'] .. '/fnet_' .. prm['debug_start_from_timestamp'] .. '_' .. prm['debug_fname'] .. '.t7'
-local optim_fname = 'work/' .. prm['debug_fname'] .. '/optim_' .. prm['debug_start_from_timestamp'] .. '_'.. prm['debug_fname'] .. '.t7'
-if utils.file_exists(fnet_fname) and utils.file_exists(optim_fname) then
+local fnet_fname = prm['debug_start_from'] 
+if utils.file_exists(fnet_fname)  then
   print('Continue training. Please delete the network file if you wish to start from the beggining\n')
   _BASE_FNET_= torch.load(fnet_fname, 'ascii')
   hpatch = ( utils.get_window_size(_BASE_FNET_)-1 )/ 2
-  _OPTIM_STATE_ =  torch.load(optim_fname, 'ascii')
+  _OPTIM_STATE_ = {}-- torch.load(optim_fname, 'ascii')
 else
   print('Start training from the begining\n')
   _BASE_FNET_, hpatch = baseNet.get(prm['net_nb_layers'], prm['net_nb_feature'], prm['net_kernel'])
@@ -178,14 +177,15 @@ feval = function(x)
       sample_input[3] = epiNeg[{{nsample},{},{}}]
     end
   
-    local sample_target = _TR_TARGET_[{{nsample},{}}]    
+    --local sample_target = _TR_TARGET_[{{nsample},{}}]    
     
     -- forward pass
     _TR_NET_:forward(sample_input)
-    _TR_ERR_ = _TR_ERR_ + _CRITERION_:forward(_TR_NET_.output, sample_target)
+    local sample_traget = nn.utils.addSingletonDimension(_TR_NET_.output[1][1]:clone():fill(1),1)
+    _TR_ERR_ = _TR_ERR_ + _CRITERION_:forward(_TR_NET_.output, sample_traget)
 
     -- backword pass
-    _TR_NET_:backward(sample_input, _CRITERION_:backward(_TR_NET_.output, sample_target))
+    _TR_NET_:backward(sample_input, _CRITERION_:backward(_TR_NET_.output, sample_traget))
      collectgarbage()
      
   end
@@ -231,8 +231,12 @@ for nepoch = 1, prm['train_nb_epoch'] do
    if arch == 'mil-contrast-max' or arch == 'mil-max' or arch == 'mil-dprog' or arch == 'mil-contrast-dprog' then
     _TR_INPUT_[3] = input[3]
    end
-   _TR_TARGET_ =  torch.ones(prm['train_batch_size'], (img_w - disp_max - 2*hpatch));  
-
+   if arch == 'contrast-dprog' or arch == 'mil-contrast-dprog'  then
+    _TR_TARGET_ =  torch.ones(prm['train_batch_size'], (img_w -2*hpatch));  
+   else
+    _TR_TARGET_ =  torch.ones(prm['train_batch_size'], (img_w - disp_max - 2*hpatch));  
+   end
+   
    -- if gpu avaliable put batch on gpu
    if prm['debug_gpu_on'] then
      for i = 1,#_TR_INPUT_ do
@@ -285,7 +289,7 @@ if prm['debug_save_on'] then
 
   -- save distance matrices
   local lines = {3,9}
-  for nline = 1,#lines do
+  for nline = 1,2 do
     
     local distMat, gtDistMat = testFun.getDist(distNet, {_VA_INPUT_[1][{{lines[nline]},{},{}}], _VA_INPUT_[2][{{lines[nline]},{},{}}]}, _VA_TARGET_[{{lines[nline]},{},{}}], prm['debug_err_th'])
 
