@@ -15,7 +15,6 @@ function contrastDprog:__init(distMin)
    parent.__init(self)
    self.distMin = distMin
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
-   self.dprogE = torch.Tensor()
    self.cols = torch.Tensor()
    self.rows = torch.Tensor()
    self.rowwiseMaxI = torch.Tensor()
@@ -36,19 +35,18 @@ function contrastDprog:updateOutput(input)
   dprog.findNonoccPath(path, pathNonOcc)
   dprog.maskE(pathNonOcc, E_masked, self.distMin)
 
-  indices = pathNonOcc:nonzero() -- valid matches
+  local indices = pathNonOcc:nonzero() -- valid matches
   self.rows = indices[{{},{1}}]:clone():squeeze():float():add(-1) -- C++ style
   self.cols = indices[{{},{2}}]:clone():squeeze():float():add(-1)
 
-  dprogE = E[pathNonOcc:byte()]:clone()
-  dim = dprogE:numel()
+  local dprogE = E[pathNonOcc:byte()]:clone()
+  local dim = dprogE:numel()
   self.rowwiseMaxI = torch.zeros(dim):float()
   rowwiseMaxE = torch.zeros(dim):float()
   self.colwiseMaxI = torch.zeros(dim):float()
   colwiseMaxE = torch.zeros(dim):float()
   dprog.findMaxForRows(E_masked, self.rows, self.rowwiseMaxI, rowwiseMaxE)
   dprog.findMaxForCols(E_masked, self.cols, self.colwiseMaxI, colwiseMaxE)
-
  
   dprogE = dprogE:double()
   rowwiseMaxE = rowwiseMaxE:double()

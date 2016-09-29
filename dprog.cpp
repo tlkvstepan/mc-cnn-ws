@@ -106,12 +106,15 @@ void accumulate(const float *E, float *pathE, float *pathLen, float *traceBack, 
       
         prevIdx = SUB2IND_2D_TORCH(ncol + dx[nneig], nrow + dy[nneig], w, h);
         
-        float curPathE   = pathE[prevIdx] + E[curIdx];
-        float curPathLen = pathLen[prevIdx] + 1;
-        
+        float curPathE;
+        float curPathLen;
+
+          curPathE   = pathE[prevIdx] + E[curIdx];
+          curPathLen = pathLen[prevIdx] + 1;
+    
         float curPathAvgE = (curPathE) / (curPathLen + 1e-10);
                 
-        if( bestPathTraceBack == -1 || bestPathAvgE < curPathAvgE ) 
+        if( bestPathTraceBack == -1 || bestPathAvgE <= curPathAvgE ) 
         {
           bestPathTraceBack = prevIdx;
           bestPathE = curPathE;
@@ -342,9 +345,7 @@ int compute(lua_State *L)
     float *pathOpt = THFloatTensor_data(pathOpt_);          // Optimal path
     float *aE = THFloatTensor_data(aE_);
     float *aS = THFloatTensor_data(aS_);
-   
-   // float *aE = new float[w*h];
-    //float *aS = new float[w*h];
+    
     float *traceBack = new float[h*w];
         
     accumulate(E, aE, aS, traceBack, w, h);
