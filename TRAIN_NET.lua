@@ -22,9 +22,9 @@ cmd = torch.CmdLine()
 assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
-cmd:option('-valid_set_size', 10)          -- 100 epi lines      
-cmd:option('-train_batch_size', 10)      -- 342 one image in KITTI
-cmd:option('-train_epoch_size', 10*1)  -- 342*389 all images in KITTI
+cmd:option('-valid_set_size', 100)          -- 100 epi lines      
+cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
+cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
 cmd:option('-train_nb_epoch', 35)        -- 100 times all images in KITTI
 
 -- training network parameters

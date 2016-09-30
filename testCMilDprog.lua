@@ -10,12 +10,16 @@ dofile('CMilDprog.lua');                     -- Dynamic programming module
 input = torch.r
 module = nn.milDprog()
 
-posRef = nn.utils.addSingletonDimension(image.load('dist_mat1.png',1,'byte'),1)
-posNeg = nn.utils.addSingletonDimension(image.load('dist_mat2.png',1,'byte'),1)
-negPos = nn.utils.addSingletonDimension(image.load('dist_mat3.png',1,'byte'),1)
+disp_max = 200
+
+mask = torch.triu(torch.tril(torch.ones(1000,1000),-1),-disp_max)
+
+refPos = torch.rand(1000,1000) + torch.eye(1000,1000)
+refNeg = torch.rand(1000,1000) + torch.eye(1000,1000)
+negPos = torch.rand(1000,1000) + torch.eye(1000,1000)
 
 
-output = module:forward({posRef, posNeg, negPos})
+output = module:forward({refPos, refNeg, negPos})
 
 print(out)
 print(inputGrad)
