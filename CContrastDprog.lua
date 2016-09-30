@@ -15,63 +15,70 @@ function contrastDprog:__init(distMin)
    parent.__init(self)
    self.distMin = distMin
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
-   self.fDprogIndices = torch.Tensor()
-   self.fMaxIndices   = torch.Tensor()
-   self.bDprogIndices = torch.Tensor()
-   self.bMaxIndices   = torch.Tensor()
+   self.cols = torch.Tensor()
+   self.rows = torch.Tensor()
+   self.rowwiseMaxI = torch.Tensor()
+   self.colwiseMaxI = torch.Tensor()
+ 
 end
 
 function contrastDprog:updateOutput(input)
   
-  local _input = input:clone():double()
-  local _outputDynProg = torch.Tensor(input:size(1),1)
-   
-  -- compute dynamic programming solution 
-  local path = torch.clone(input):zero():float()
-  local fDprogCost = torch.zeros(input:size(1)):float()
-  local bDprogCost = torch.zeros(input:size(1)):float()
-  self.fDprogIndices = torch.zeros(input:size(1)):float()
-  self.bDprogIndices = torch.zeros(input:size(1)):float()
+  local E = input:clone():float()
+  local E_masked = input:clone():float()
+  local path = input:clone():zero():float()
+  local pathNonOcc = input:clone():zero():float()
+  local aE = input:clone():zero():float()
+  local aS = input:clone():zero():float()
   
-  dprog.compute(input, path, fDprogCost, bDprogCost, self.fDprogIndices, self.bDprogIndices);
+  dprog.compute(E, path, aE, aS)
+  dprog.findNonoccPath(path, pathNonOcc)
+  dprog.maskE(pathNonOcc, E_masked, self.distMin)
 
+  local indices = pathNonOcc:nonzero() -- valid matches
+  self.rows = indices[{{},{1}}]:clone():squeeze():float():add(-1) -- C++ style
+  self.cols = indices[{{},{2}}]:clone():squeeze():float():add(-1)
 
-
-
-  _outputDynProg=_outputDynProg:double()
-
-  self._indicesDynProg = nn.utils.addSingletonDimension(self._indicesDynProg:long(),2)
-  self._indicesDynProg = self._indicesDynProg + 1;
+  local dprogE = E[pathNonOcc:byte()]:clone()
+  local dim = dprogE:numel()
+  self.rowwiseMaxI = torch.zeros(dim):float()
+  rowwiseMaxE = torch.zeros(dim):float()
+  self.colwiseMaxI = torch.zeros(dim):float()
+  colwiseMaxE = torch.zeros(dim):float()
+  dprog.findMaxForRows(E_masked, self.rows, self.rowwiseMaxI, rowwiseMaxE)
+  dprog.findMaxForCols(E_masked, self.cols, self.colwiseMaxI, colwiseMaxE)
+ 
+  dprogE = dprogE:double()
+  rowwiseMaxE = rowwiseMaxE:double()
+  colwiseMaxE = colwiseMaxE:double()
   
-  -- mask dyn prog solution and all neighbours of the sol
-   for dist = -self.distMin, self.distMin do
-     local ind =  self._indicesDynProg + dist
-     ind[ind:lt(1)] = 1
-     ind[ind:gt(_input:size(2))] = _input:size(2)
-     _input = _input:scatter(2, ind, -1/0)
-   end
+  -- if cuda is on than transfer all to cuda 
+  if input:type() == "torch.CudaTensor" then
+ 
+    dprogE = dprogE:cuda()
+    rowwiseMaxE = rowwiseMaxE:cuda()
+    colwiseMaxE = colwiseMaxE:cuda()
+    
+  end
+
+  self.output = torch.cat({nn.utils.addSingletonDimension(dprogE,2), nn.utils.addSingletonDimension(rowwiseMaxE,2), nn.utils.addSingletonDimension(colwiseMaxE,2)}, 2)
    
-   -- compute greedy solution
-   local _outputMax
-   _outputMax, self._indicesMax = torch.max(_input, 2)
-      
-   -- if input is cuda tensor than do only dprog on CPU 
-   if input:type() == "torch.CudaTensor" then
-      self.output = torch.cat({_outputDynProg:cuda(),_outputMax:cuda()},2)
-      self._indicesMax = self._indicesMax:cuda()
-      self._indicesDynProg = self._indicesDynProg:cuda()
-   else
-      self.output = torch.cat({_outputDynProg,_outputMax},2)
-   end  
-   return self.output
+  return self.output
 end
 
 function contrastDprog:updateGradInput(input, gradOutput)
    
    -- pass input gradient to dyn prog and max 
-   self.gradInput:resizeAs(input):zero()
-   self.gradInput:scatter(2, self._indicesDynProg, nn.utils.addSingletonDimension(gradOutput:select(2,1),2))
-   self.gradInput:scatter(2, self._indicesMax, nn.utils.addSingletonDimension(gradOutput:select(2,2),2))
+   self.gradInput = self.gradInput:resizeAs(input):zero():float()
    
+   dprog.collect(self.gradInput, gradOutput:select(2,1):float(), self.cols, self.rows)
+   dprog.collect(self.gradInput, gradOutput:select(2,2):float(), self.rowwiseMaxI, self.rows)
+   dprog.collect(self.gradInput, gradOutput:select(2,3):float(), self.cols, self.colwiseMaxI)
+    
+   self.gradInput = self.gradInput:double() 
+   if input:type() == "torch.CudaTensor" then 
+    self.gradInput = self.gradInput:cuda()
+   end
+      
    return self.gradInput
 end

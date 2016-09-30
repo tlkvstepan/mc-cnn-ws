@@ -136,6 +136,18 @@ function utils.file_exists(fname)
    if f~=nil then io.close(f) return true else return false end
 end
 
+function utils.meshgrid(w,h)
+  
+  local x = torch.range(1, w);
+  x = x:view(1,x:numel()):clone();
+  local y = torch.range(1, h);
+  y = y:view(y:numel(),1):clone();
+  local xx = torch.repeatTensor(x,y:size(1),1);
+  local yy = torch.repeatTensor(y,1,x:size(2));
+  
+  return xx, yy
+end
+
 function utils.get_window_size(net)
    local ws = 1
    for i = 1,#net.modules do
