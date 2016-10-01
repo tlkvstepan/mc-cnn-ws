@@ -16,6 +16,11 @@
 6. compare stereo performance on KITTI12, KITTI15 and Middlebury
 7. make equperformance curve for our best net and supervised net
 
+-- minor code improvements
+1. save net together with optim state and train parameters (it will allow to simply restart learning). 
+2. make two axis plot for optim logger (will allow to show to scale for train and test error)
+3. save timestamp in optim logger (it will help to do early stopping).
+
 -- ideas
 1. learn smoothness cost and reiterate (self learning)
 2. training data is errorneous
