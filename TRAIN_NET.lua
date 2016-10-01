@@ -41,7 +41,8 @@ cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
 cmd:option('-debug_gpu_on', false)
 cmd:option('-debug_save_on', true)
-cmd:option('-debug_start_from', '')
+cmd:option('-debug_start_from_fnet', 'work/test/fnet_2016_10_01_09:29:09_mil-contrast-max.t7')
+cmd:option('-debug_start_from_optim', 'work/test/optim_2016_10_01_09:29:09_mil-contrast-max.t7')
 
 prm = cmd:parse(arg)
 prm['arch'] = arch
@@ -96,12 +97,13 @@ local img_w = img1_arr:size(3);
 
 -- |define test and training networks|
 -- If we choose to start from timestamp, when try to read pre-trained base feature net
-local fnet_fname = prm['debug_start_from'] 
-if utils.file_exists(fnet_fname)  then
-  print('Continue training. Please delete the network file if you wish to start from the beggining\n')
+local fnet_fname = prm['debug_start_from_fnet'] 
+local optim_fname = prm['debug_start_from_optim'] 
+if utils.file_exists(fnet_fname) and utils.file_exists(optim_fname)   then
+  print('Continue training.\n')
   _BASE_FNET_= torch.load(fnet_fname, 'ascii')
   hpatch = ( utils.get_window_size(_BASE_FNET_)-1 )/ 2
-  _OPTIM_STATE_ = {}-- torch.load(optim_fname, 'ascii')
+  _OPTIM_STATE_ = torch.load(optim_fname, 'ascii')
 else
   print('Start training from the begining\n')
   _BASE_FNET_, hpatch = baseNet.get(prm['net_nb_layers'], prm['net_nb_feature'], prm['net_kernel'])
