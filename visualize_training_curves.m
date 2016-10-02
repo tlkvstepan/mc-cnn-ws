@@ -18,7 +18,7 @@ legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
 figure;
 title('contrast-max net')
 logContrastMaxFile = 'work/contrast-max/contrast-max-2016_09_28_09:58:58'
-logContrastMax = dlmread(logContrastMaxFile, ' ', 1, 1)
+logContrastMax = dlmread(logContrastMaxFile, ' ', 1, 1);
 yyaxis left
 plot(logContrastMax(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
@@ -32,8 +32,10 @@ legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
 % mil-contrast-max
 figure;
 title('mil-contrast-max net')
-logMilMaxFile = 'work/mil-contrast-max/mil-contrast-max-2016_09_29_12:58:18'
-logMilMax = dlmread(logMilMaxFile, ' ', 1, 1)
+logMilContrastMaxFile1 = 'work/mil-contrast-max/mil-contrast-max-2016_09_29_12:58:18'
+logMilContrastMaxFile2 =  'work/mil-contrast-max/mil-contrast-max-2016_10_02_11:07:26'
+logMilMax = [dlmread(logMilContrastMaxFile1, ' ', 1, 1);...
+             dlmread(logMilContrastMaxFile2, ' ', 1, 1)]
 yyaxis left
 plot(logMilMax(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')

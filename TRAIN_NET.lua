@@ -39,10 +39,10 @@ cmd:option('-net_nb_layers', 4)
 -- debug
 cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
-cmd:option('-debug_gpu_on', false)
+cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
-cmd:option('-debug_start_from_fnet', 'work/test/fnet_2016_10_01_09:29:09_mil-contrast-max.t7')
-cmd:option('-debug_start_from_optim', 'work/test/optim_2016_10_01_09:29:09_mil-contrast-max.t7')
+cmd:option('-debug_start_from_fnet', '')
+cmd:option('-debug_start_from_optim', '')
 
 prm = cmd:parse(arg)
 prm['arch'] = arch
@@ -83,7 +83,6 @@ if( prm['debug_gpu_on'] ) then
   require 'cunn'
 end
 
--- Set random seeds for math and torch for repeatability
 math.randomseed(0); 
 torch.manualSeed(0)
 
@@ -99,6 +98,8 @@ local img_w = img1_arr:size(3);
 -- If we choose to start from timestamp, when try to read pre-trained base feature net
 local fnet_fname = prm['debug_start_from_fnet'] 
 local optim_fname = prm['debug_start_from_optim'] 
+_BASE_FNET_, hpatch = baseNet.get(prm['net_nb_layers'], prm['net_nb_feature'], prm['net_kernel'])
+_OPTIM_STATE_ = {}
 if utils.file_exists(fnet_fname) and utils.file_exists(optim_fname)   then
   print('Continue training.\n')
   _BASE_FNET_= torch.load(fnet_fname, 'ascii')
@@ -106,8 +107,6 @@ if utils.file_exists(fnet_fname) and utils.file_exists(optim_fname)   then
   _OPTIM_STATE_ = torch.load(optim_fname, 'ascii')
 else
   print('Start training from the begining\n')
-  _BASE_FNET_, hpatch = baseNet.get(prm['net_nb_layers'], prm['net_nb_feature'], prm['net_kernel'])
-  _OPTIM_STATE_ = {}
 end
 
 -- make training network (note that parameters are copied from base feature network)
@@ -142,7 +141,8 @@ _BASE_PPARAM_ = _BASE_FNET_:getParameters()
 _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 
 -- |define datasets|
-
+-- we want to have same training and test set all the time 
+-- therfor we need to sat randomseed here (rand is used in net initialization)
 local unsupSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
 local supSet = sup2EpiSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
 supSet:shuffle()  -- shuffle to have patches from all images

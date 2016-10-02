@@ -118,28 +118,40 @@ function milDprog:updateOutput(input)
     bwd = torch.cat({dprogPosRefE, dprogPosNegE}, 2)
       
   end
-  
-  
+    
   self.output = {fwd, bwd}
-   
+    
+  -- note:
+  -- 1. sometimes fwd or bwd can be empty
+  -- 2. number of elements in fwd and bwd can be differenet 
+  
   return self.output
+    
 end
 
 function milDprog:updateGradInput(input, gradOutput)
    
-  gradOutput_fwd, gradOutput_bwd = unpack(gradOutput)
-  E_refPos, E_refNeg, E_negPos = unpack(input)
+  local gradOutput_fwd, gradOutput_bwd = unpack(gradOutput)
+  local E_refPos, E_refNeg, E_negPos = unpack(input)
+  
+  
+  local dprogPosRefE_grad = gradOutput_bwd[{{},{1}}]:squeeze():float()
+  local dprogPosNegE_grad = gradOutput_bwd[{{},{2}}]:squeeze():float()
+  
+  local dprogRefPosE_grad = gradOutput_fwd[{{},{1}}]:squeeze():float()
+  local dprogRefNegE_grad = gradOutput_fwd[{{},{2}}]:squeeze():float()  
   
    -- pass input gradient to dyn prog and max 
-   self.gradInput_refPos = self.gradInput:resizeAs(E_refPos):zero():float()
-   self.gradInput_refNeg = self.gradInput:resizeAs(E_refNeg):zero():float()
-   self.gradInput_negPos = self.gradInput:resizeAs(E_negPos):zero():float()
+   self.gradInput[1] = self.gradInput:resizeAs(E_refPos):zero():float()
+   self.gradInput[2] = self.gradInput:resizeAs(E_refNeg):zero():float()
+   self.gradInput[3] = self.gradInput:resizeAs(E_negPos):zero():float()
    
-   dprog.collect(self.gradInput, gradOutput:select(2,1):float(), self.cols, self.rows)
-   dprog.collect(self.gradInput, gradOutput:select(2,2):float(), self.rowwiseMaxI, self.rows)
-   dprog.collect(self.gradInput, gradOutput:select(2,3):float(), self.cols, self.colwiseMaxI)
+   dprog.collect(self.gradInput_refPos, gradOutput:select(2,1):float(), self.cols, self.rows)
+   dprog.collect(self.gradInput_refNeg, gradOutput:select(2,2):float(), self.rowwiseMaxI, self.rows)
+   dprog.collect(self.gradInput_negPos, gradOutput:select(2,3):float(), self.cols, self.colwiseMaxI)
     
    self.gradInput = self.gradInput:double() 
+   
    if input:type() == "torch.CudaTensor" then 
     self.gradInput = self.gradInput:cuda()
    end
