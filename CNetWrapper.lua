@@ -126,7 +126,7 @@ local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.25):add(milBwdCst,0.25):add(contrastFwdCst,0.25):add(contrastBwdCst,0.25)
+local criterion = nn.ParallelCriterion():add(milFwdCst,0.25):add(milBwdCst,0.25):add(contrastFwdCst,0.25):add(contrastBwdCst,0.25)
 
 return Net, criterion
 
@@ -255,7 +255,7 @@ local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
 local maxFwdCst = nn.MarginRankingCriterion(loss_margin);
 local maxBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.25):add(milBwdCst,0.25):add(maxFwdCst,0.25):add(maxBwdCst,0.25)
+local criterion = nn.ParallelCriterion():add(milFwdCst,0.25):add(milBwdCst,0.25):add(maxFwdCst,0.25):add(maxBwdCst,0.25)
 
 return Net, criterion
 
@@ -367,7 +367,7 @@ milBwdSel:add(nn.SelectTable(4))  -- pos-neg-max
 
 local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.5):add(milBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(milFwdCst,1):add(milBwdCst,1)
 
 return Net, criterion
 
@@ -508,7 +508,7 @@ milBwdSel:add(nn.SelectTable(4))  -- pos-neg-max
 
 local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.5):add(milBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(milFwdCst,1):add(milBwdCst,1)
 
 return Net, criterion
 
@@ -559,7 +559,7 @@ stream2:add(nn.SplitTable(2))
 
 local contrastFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(contrastFwdCst,0.5):add(contrastBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(contrastFwdCst,1):add(contrastBwdCst,1)
 
 return Net, criterion
 end 
@@ -590,7 +590,7 @@ Net:add(nn.addMatrix(mask))
 -- clamp (-1, 1)
 Net:add(nn.Clamp(-1,1))
 
--- convert range to (0 -1)
+-- convert range to (0 1)
 Net:add(nn.AddConstant(1))
 Net:add(nn.MulConstant(0.5))
 
@@ -615,7 +615,7 @@ NetBCostSel:add(nn.SelectTable(3))
 
 local contrastiveFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastiveBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(contrastiveFwdCst,0.5):add(contrastiveBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(contrastiveFwdCst,1):add(contrastiveBwdCst,1)
 
 --Net:add(nn.JoinTable(1))
 --Net:add(nn.SplitTable(2))

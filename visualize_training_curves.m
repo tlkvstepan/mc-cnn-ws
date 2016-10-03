@@ -33,7 +33,7 @@ legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
 figure;
 title('mil-contrast-max net')
 logMilContrastMaxFile1 = 'work/mil-contrast-max/mil-contrast-max-2016_09_29_12:58:18'
-logMilContrastMaxFile2 =  'work/mil-contrast-max/mil-contrast-max-2016_10_02_11:07:26'
+logMilContrastMaxFile2 =  'work/mil-contrast-max/mil-contrast-max-2016_10_02_13:18:26'
 logMilMax = [dlmread(logMilContrastMaxFile1, ' ', 1, 1);...
              dlmread(logMilContrastMaxFile2, ' ', 1, 1)]
 yyaxis left

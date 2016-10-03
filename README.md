@@ -25,3 +25,4 @@
 1. learn smoothness cost and reiterate (self learning)
 2. training data is errorneous
 3. impose order: closer to true maximim higher similarity
+4. mil-dprog might be not optimal due to large number of occlusion in ref-neg ( use hybrid? )

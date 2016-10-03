@@ -223,7 +223,7 @@ int collect(lua_State *L)
     
     for( int i = 0; i < n; ++i ) {
       int idx = SUB2IND_2D_TORCH(col[i], row[i], w, h);
-      mat[idx] = val[i];
+      mat[idx] += val[i];
     }
      
   return 0;

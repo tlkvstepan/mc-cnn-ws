@@ -22,10 +22,10 @@ cmd = torch.CmdLine()
 assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
-cmd:option('-valid_set_size', 100)          -- 100 epi lines      
+cmd:option('-valid_set_size', 100)        -- 100 epi lines      
 cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
 cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
-cmd:option('-train_nb_epoch', 35)        -- 100 times all images in KITTI
+cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
@@ -170,6 +170,8 @@ feval = function(x)
   local epiRef, epiPos, epiNeg = unpack(_TR_INPUT_) -- epiNeg does not exist for  contrast-max and contrast-dprog
 
   _TR_ERR_ = 0;   
+  
+  local nb_comp_ttl = 0;
   for nsample = 1, batch_size do
     
     local sample_input = {}
@@ -179,20 +181,37 @@ feval = function(x)
       sample_input[3] = epiNeg[{{nsample},{},{}}]
     end
   
-    --local sample_target = _TR_TARGET_[{{nsample},{}}]    
-    
-    -- forward pass
+    -- forward pass through net
     _TR_NET_:forward(sample_input)
-    local sample_traget = nn.utils.addSingletonDimension(_TR_NET_.output[1][1]:clone():fill(1),1)
-    _TR_ERR_ = _TR_ERR_ + _CRITERION_:forward(_TR_NET_.output, sample_traget)
+    
+    -- find number of nonempty output tabels
+    local nb_tables = #_TR_NET_.output
+    
+    -- if nuber of nonempty output tables is 0, we can not do anything
+    if nb_tables ~= 0 then
+    
+      -- make target array for every table, and simultaneously compute 
+      -- total number of samples
+      local sample_target = {};
+      for ntable = 1,nb_tables do
+        local nb_comp = _TR_NET_.output[ntable][1]:numel()
+        nb_comp_ttl = nb_comp_ttl + nb_comp;
+        sample_target[ntable] = nn.utils.addSingletonDimension(_TR_NET_.output[ntable][1]:clone():fill(1),1) 
+      end
+      
+      -- pass through criterion
+      _TR_ERR_ = _TR_ERR_ + _CRITERION_:forward(_TR_NET_.output, sample_target)
 
-    -- backword pass
-    _TR_NET_:backward(sample_input, _CRITERION_:backward(_TR_NET_.output, sample_traget))
-     collectgarbage()
+      -- backword pass
+      _TR_NET_:backward(sample_input, _CRITERION_:backward(_TR_NET_.output, sample_target))
+       collectgarbage()
+     
+     end
      
   end
-  _TR_ERR_ = _TR_ERR_ / prm['train_batch_size']
-  _TR_PGRAD_:div(prm['train_batch_size']);
+  
+  _TR_ERR_ = _TR_ERR_ / nb_comp_ttl
+  _TR_PGRAD_:div(nb_comp_ttl);
 
   return _TR_ERR_, _TR_PGRAD_      
 end

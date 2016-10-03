@@ -18,7 +18,7 @@ function milDprog:__init()
    ----
    self.activeRowsPos = torch.Tensor()
    self.matchColPosRef =torch.Tensor()
-   
+   self.matchColPosNeg = torch.Tensor()
 end
 
 function milDprog:updateOutput(input)
@@ -141,20 +141,32 @@ function milDprog:updateGradInput(input, gradOutput)
   local dprogRefPosE_grad = gradOutput_fwd[{{},{1}}]:squeeze():float()
   local dprogRefNegE_grad = gradOutput_fwd[{{},{2}}]:squeeze():float()  
   
-   -- pass input gradient to dyn prog and max 
-   self.gradInput[1] = self.gradInput:resizeAs(E_refPos):zero():float()
-   self.gradInput[2] = self.gradInput:resizeAs(E_refNeg):zero():float()
-   self.gradInput[3] = self.gradInput:resizeAs(E_negPos):zero():float()
-   
-   dprog.collect(self.gradInput_refPos, gradOutput:select(2,1):float(), self.cols, self.rows)
-   dprog.collect(self.gradInput_refNeg, gradOutput:select(2,2):float(), self.rowwiseMaxI, self.rows)
-   dprog.collect(self.gradInput_negPos, gradOutput:select(2,3):float(), self.cols, self.colwiseMaxI)
+  local distNegPos = E_negPos:float():clone():zero()
+  local distRefPos = E_refPos:float():clone():zero()
+  local distRefNeg = E_refNeg:float():clone():zero()
+  
+  dprog.collect(distRefNeg, dprogRefNegE_grad, self.matchColRefNeg, self.activeRowsRef)
+  
+  dprog.collect(distRefPos, dprogRefPosE_grad, self.matchColRefPos, self.activeRowsRef)
+  -- pos-ref is transpose of ref-pose
+  local distPosRef = distRefPos:t()
+  dprog.collect(distPosRef, dprogPosRefE_grad, self.matchColPosRef, self.activeRowsPos)
+  
+  -- pos-neg is transpose of neg-pos
+  local distPosNeg = distNegPos:t()
+  dprog.collect(distPosNeg, dprogPosNegE_grad, self.matchColPosNeg, self.activeRowsPos)
     
-   self.gradInput = self.gradInput:double() 
-   
-   if input:type() == "torch.CudaTensor" then 
-    self.gradInput = self.gradInput:cuda()
+  distNegPos = distNegPos:double() 
+  distRefPos = distRefPos:double() 
+  distRefNeg = distRefNeg:double() 
+  
+   if input[1]:type() == "torch.CudaTensor" then 
+    distNegPos = distNegPos:cuda()
+    distRefPos = distRefPos:cuda()
+    distRefNeg = distRefNeg:cuda()
    end
+   
+   self.gradInput = {distRefPos, distRefNeg, distNegPos}
       
    return self.gradInput
 end
