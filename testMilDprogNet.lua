@@ -52,16 +52,16 @@ fNets:add(fNetNeg)
 -- compute 3 cross products: ref and pos, ref and neg, pos and neg
 local fNets2dNetCom = nn.ConcatTable()
 Net:add(fNets2dNetCom); -- feature net to distance net commutator
-local dNetRefPos_ = nn.Sequential()
+local dNetRefPos = nn.Sequential()
 local dNetRefNeg = nn.Sequential()
 local dNetNegPos = nn.Sequential()
-fNets2dNetCom:add(dNetRefPos_)
+fNets2dNetCom:add(dNetRefPos)
 fNets2dNetCom:add(dNetRefNeg)
 fNets2dNetCom:add(dNetNegPos)
 local dNetRefPosSel = nn.ConcatTable()  -- input selectors for each distance net
 local dNetRefNegSel = nn.ConcatTable()
 local dNetNegPosSel = nn.ConcatTable()
-dNetRefPos_:add(dNetRefPosSel)
+dNetRefPos:add(dNetRefPosSel)
 dNetRefNeg:add(dNetRefNegSel)
 dNetNegPos:add(dNetNegPosSel)
 dNetRefPosSel:add(nn.SelectTable(1))
@@ -70,7 +70,7 @@ dNetRefNegSel:add(nn.SelectTable(1))
 dNetRefNegSel:add(nn.SelectTable(3))
 dNetNegPosSel:add(nn.SelectTable(3))
 dNetNegPosSel:add(nn.SelectTable(2))
-dNetRefPos_:add(nn.MM(false, true))
+dNetRefPos:add(nn.MM(false, true))
 dNetRefNeg:add(nn.MM(false, true))
 dNetNegPos:add(nn.MM(false, true))
 
@@ -80,18 +80,17 @@ dNetNegPos:add(nn.MM(false, true))
 local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
 mask = torch.triu(torch.tril(mask,-1),-disp_max)
 mask = mask - 2; 
-dNetRefPos_:add(nn.addMatrix(mask))
+dNetRefPos:add(nn.addMatrix(mask))
 dNetRefNeg:add(nn.addMatrix(mask))
 dNetNegPos:add(nn.addMatrix(mask))
-
 -- clamp (-1, 1)
-dNetRefPos_:add(nn.Clamp(-1,1))
+dNetRefPos:add(nn.Clamp(-1,1))
 dNetRefNeg:add(nn.Clamp(-1,1))
 dNetNegPos:add(nn.Clamp(-1,1))
 
 -- convert range to (0 1)
-dNetRefPos_:add(nn.AddConstant(1))
-dNetRefPos_:add(nn.MulConstant(0.5))
+dNetRefPos:add(nn.AddConstant(1))
+dNetRefPos:add(nn.MulConstant(0.5))
 dNetRefNeg:add(nn.AddConstant(1))
 dNetRefNeg:add(nn.MulConstant(0.5))
 dNetNegPos:add(nn.AddConstant(1))
@@ -101,10 +100,10 @@ dNetNegPos:add(nn.MulConstant(0.5))
 Net:add(nn.milDprog())
 
 -- split each table into two
-local splitNet = nn.ParallelTable()
-Net:add(splitNet)
-splitNet:add(nn.SplitTable(2))
-splitNet:add(nn.SplitTable(2))
+--local splitNet = nn.ParallelTable()
+--Net:add(splitNet)
+--splitNet:add(nn.SplitTable(2))
+--splitNet:add(nn.SplitTable(2))
 ---- make 2 copies of refPos distance matrix, since we use will use it twice 
 ---- as ref-pos and pos-ref
 --dNetRefPos_:add(nn.Replicate(2))
@@ -171,15 +170,15 @@ print(os.difftime(end_cpu, start_cpu))
 
 
 -- cuda
-input = {torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda()};
-Net:cuda()
-start_gpu = os.time()
-output_gpu = Net:forward(input)
-end_gpu = os.time()
-print(os.difftime(end_gpu, start_gpu))
+--input = {torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda(), torch.rand(1,2*hpatch+1,img_w):cuda()};
+--Net:cuda()
+--start_gpu = os.time()
+--output_gpu = Net:forward(input)
+--end_gpu = os.time()
+--print(os.difftime(end_gpu, start_gpu))
 
-criOut = parCri:forward(netOut, targ)
-outGradCri = parCri:backward(netOut, targ)
+--criOut = parCri:forward(netOut, targ)
+--outGradCri = parCri:backward(netOut, targ)
   
 --Net:backward(netIn, parCri:backward(criIn, criTarg))
 

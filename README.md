@@ -1,11 +1,8 @@
 -- code fix
-1. make mil-dprog function
-2. make mil-contrast-dprog function 
-3. fix test net function
-4. add Middlebury and KITTI15 datasets
-6. tune stereo pipeline with best of our nets (1000 random parameters samples)
-7. compare best of our net with supervised
-8. make equi-performance curve on our test set (for best of our nets and supervised)    
+1. fix test net function
+2. add Middlebury and KITTI15 datasets
+3. tune stereo pipeline with best of our nets (1000 random parameters samples)
+4. make equi-performance curve on our test set (for best of our nets and supervised)    
 
 -- experiments    
 1. train mil-contrast-max, contrast-dprog, mil-dprog and mil-contrast-dprog nets.

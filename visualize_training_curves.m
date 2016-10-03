@@ -1,3 +1,4 @@
+close all;
 
 % mil-max
 figure;
@@ -34,14 +35,29 @@ figure;
 title('mil-contrast-max net')
 logMilContrastMaxFile1 = 'work/mil-contrast-max/mil-contrast-max-2016_09_29_12:58:18'
 logMilContrastMaxFile2 =  'work/mil-contrast-max/mil-contrast-max-2016_10_02_13:18:26'
-logMilMax = [dlmread(logMilContrastMaxFile1, ' ', 1, 1);...
+logMilContrastMax = [dlmread(logMilContrastMaxFile1, ' ', 1, 1);...
              dlmread(logMilContrastMaxFile2, ' ', 1, 1)]
 yyaxis left
-plot(logMilMax(:,1)); hold on
+plot(logMilContrastMax(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
 yyaxis right
-plot(logMilMax(:,2)); hold on
-plot(smooth(logMilMax(:,2),15)); hold on
+plot(logMilContrastMax(:,2)); hold on
+plot(smooth(logMilContrastMax(:,2),15)); hold on
+ylabel('Test accuracy: % of pixels |d-d_{gt}|<3')
+xlabel('epoch#')
+legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
+
+% contrast-dprog
+figure;
+title('contrast-dprog net')
+logContrastDprogFile = 'work/contrast-dprog/contrast-dprog-2016_10_03_09:32:23'
+logContrastDprog = dlmread(logContrastDprogFile, ' ', 1, 1)
+yyaxis left
+plot(logContrastDprog(:,1)); hold on
+ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
+yyaxis right
+plot(logContrastDprog(:,2)); hold on
+plot(smooth(logContrastDprog(:,2),15)); hold on
 ylabel('Test accuracy: % of pixels |d-d_{gt}|<3')
 xlabel('epoch#')
 legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })

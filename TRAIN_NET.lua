@@ -22,14 +22,20 @@ cmd = torch.CmdLine()
 assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
-cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
-cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
+--cmd:option('-valid_set_size', 100)        -- 100 epi lines      
+--cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
+--cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
+--cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
+cmd:option('-valid_set_size', 10)        -- 100 epi lines      
+cmd:option('-train_batch_size', 30)      -- 342 one image in KITTI
+cmd:option('-train_epoch_size', 30*1)  -- 342*389 all images in KITTI
 cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
+
 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
 cmd:option('-dist_min', 2)
+cmd:option('-occ_th', 4)
 
 -- feature network parameters
 cmd:option('-net_nb_feature', 64)
@@ -38,7 +44,7 @@ cmd:option('-net_nb_layers', 4)
 
 -- debug
 cmd:option('-debug_err_th', 3)
-cmd:option('-debug_fname', 'test')
+cmd:option('-debug_fname', 'test1')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_start_from_fnet', '')
@@ -62,10 +68,10 @@ require 'nn'
 dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to the input (I use it for masking purposes)
 
 require 'libdprog'                        -- C++ module for dynamic programming
-dofile('CDprog.lua');                     -- Dynamic programming module
 dofile('CContrastDprog.lua');             -- Contrastive dynamic programming module
 dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
-
+dofile('CMilDprog.lua');
+dofile('CMilContrastDprog.lua')
 dofile('DataLoader.lua');                 -- Parent class for dataloaders
 dofile('CUnsup3EpiSet.lua');              -- Unsupervised training set loader
 dofile('CSup2EpiSet.lua');          -- Supervised validation set loader
@@ -113,15 +119,15 @@ end
 if arch == 'mil-max' then
   _TR_NET_, _CRITERION_ =  netWrapper.getMilMax(img_w, disp_max, hpatch, prm['loss_margin'], _BASE_FNET_)
 elseif arch == 'mil-dprog' then
-   _TR_NET_, _CRITERION_ =  netWrapper.getMilDprog(img_w, disp_max, hpatch, prm['loss_margin'], _BASE_FNET_)
+   _TR_NET_, _CRITERION_ =  netWrapper.getMilDprog(img_w, disp_max, hpatch, prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
 elseif arch == 'contrast-max' then
   _TR_NET_, _CRITERION_ = netWrapper.getContrastMax(img_w, disp_max, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)  
 elseif arch == 'contrast-dprog' then
-  _TR_NET_, _CRITERION_ = netWrapper.getContrastDprog(img_w, disp_max, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)
+  _TR_NET_, _CRITERION_ = netWrapper.getContrastDprog(img_w, disp_max, hpatch, prm['dist_min'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
 elseif arch == 'mil-contrast-max' then
   _TR_NET_, _CRITERION_ = netWrapper.getMilContrastMax(img_w, disp_max, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)
 elseif arch == 'mil-contrast-dprog' then
-  _TR_NET_, _CRITERION_ = netWrapper.getMilContrastDprog(img_w, disp_max, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)
+  _TR_NET_, _CRITERION_ = netWrapper.getMilContrastDprog(img_w, disp_max, hpatch, prm['dist_min'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
 end
 
 -- put training net, base net, criterion and state of optimizer on gpu if needed
@@ -230,9 +236,7 @@ if prm['debug_save_on'] then
   logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
   logger:setNames{'Training loss', 
     'Accuracy (<3 disparity err)'}
-  logger:style{'+-',
-    '+-',
-    '+-'}
+  logger:style{'+-', '+-'}
 end    
 
 -- |optimize network|   
@@ -252,18 +256,12 @@ for nepoch = 1, prm['train_nb_epoch'] do
    if arch == 'mil-contrast-max' or arch == 'mil-max' or arch == 'mil-dprog' or arch == 'mil-contrast-dprog' then
     _TR_INPUT_[3] = input[3]
    end
-   if arch == 'contrast-dprog' or arch == 'mil-contrast-dprog'  then
-    _TR_TARGET_ =  torch.ones(prm['train_batch_size'], (img_w -2*hpatch));  
-   else
-    _TR_TARGET_ =  torch.ones(prm['train_batch_size'], (img_w - disp_max - 2*hpatch));  
-   end
    
    -- if gpu avaliable put batch on gpu
    if prm['debug_gpu_on'] then
      for i = 1,#_TR_INPUT_ do
      _TR_INPUT_[i] = _TR_INPUT_[i]:cuda()
      end
-     _TR_TARGET_ = _TR_TARGET_:cuda()
    end
     
    optim.adam(feval, _TR_PPARAM_, {}, _OPTIM_STATE_)    

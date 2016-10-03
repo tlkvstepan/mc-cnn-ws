@@ -10,117 +10,73 @@
 
 local milDprog, parent = torch.class('nn.milDprog', 'nn.Module')
 
-function milDprog:__init()
+function milDprog:__init(occ_th)
    parent.__init(self)
-   self.activeRowsRef = torch.Tensor() 
-   self.matchColRefPos= torch.Tensor() 
-   self.matchColRefNeg= torch.Tensor()
+   self.occ_th = occ_th
+   -- self.cols 
+   -- self.rows 
+   ---
+   -- self.matchColRefNeg 
    ----
-   self.activeRowsPos = torch.Tensor()
-   self.matchColPosRef =torch.Tensor()
-   self.matchColPosNeg = torch.Tensor()
+   -- self.matchRowNegPos 
+
 end
 
 function milDprog:updateOutput(input)
   
-  E_refPos, E_refNeg, E_negPos= unpack(input)
+  local E_refPos, E_refNeg, E_negPos = unpack(input)
   
-  local E_refPos = E_refPos:clone():float()
-  local E_refNeg = E_refNeg:clone():float()
-  local E_negPos= E_negPos:clone():float()
-  local dim = E_negPos:size(2)
+  E_refPos = E_refPos:float()
+  E_refNeg = E_refNeg:float()
+  E_negPos= E_negPos:float()
   
-  local path_refPos = E_refPos:clone():zero():float()
-  local pathNonOcc_refPos = E_refPos:clone():zero():float()
-  local path_refNeg = E_refNeg:clone():zero():float()
-  local pathNonOcc_refNeg = E_refNeg:clone():zero():float()
-  local path_negPos= E_negPos:clone():zero():float()
-  local pathNonOcc_negPos= E_negPos:clone():zero():float()
-  local pathE = E_negPos:clone():zero():float() 
-  local pathLen = E_negPos:clone():zero():float()
-    
-  dprog.compute(E_refPos, path_refPos, pathE:zero(), pathLen:zero())
-  dprog.compute(E_refNeg, path_refNeg, pathE:zero(), pathLen:zero())
-  dprog.compute(E_negPos, path_negPos, pathE:zero(), pathLen:zero())
-  
-  dprog.findNonoccPath(path_refPos, pathNonOcc_refPos)
-  dprog.findNonoccPath(path_refNeg, pathNonOcc_refNeg)
-  dprog.findNonoccPath(path_negPos, pathNonOcc_negPos)
-  
-  pathNonOcc_refPos = pathNonOcc_refPos:byte() 
-  pathNonOcc_refNeg = pathNonOcc_refNeg:byte() 
-  pathNonOcc_negPos = pathNonOcc_negPos:byte() 
-  
-  
-  pathNonOcc_posNeg = pathNonOcc_negPos:clone():t()   
-  pathNonOcc_posRef = pathNonOcc_refPos:clone():t()
-  
-  -- find rows that simultaneously are not occluded in refPos and refNeg solution
-  local maskFwd = torch.repeatTensor(pathNonOcc_refPos:max(2), 1, dim)
-  maskFwd:cmul(torch.repeatTensor(pathNonOcc_refNeg:max(2), 1, dim))
-  pathNonOcc_refPos:cmul(maskFwd)
-  pathNonOcc_refNeg:cmul(maskFwd)
-    
-  local fwd  
-  if not torch.all(maskFwd:eq(0))  then
-    local indices = pathNonOcc_refPos:nonzero() -- valid matches
-    local dprogRefPosE = E_refPos[pathNonOcc_refPos]:clone()
-    self.activeRowsRef = indices[{{},{1}}]:clone():squeeze():float():add(-1) -- C++ style
-    self.matchColRefPos = indices[{{},{2}}]:clone():squeeze():float():add(-1)
-    local indices = pathNonOcc_refNeg:nonzero() -- valid matches
-    local dprogRefNegE = E_refNeg[pathNonOcc_refNeg]:clone()
-    self.matchColRefNeg = indices[{{},{2}}]:clone():squeeze():float():add(-1)
-  
-    dprogRefNegE = nn.utils.addSingletonDimension(dprogRefNegE:double(),2)
-    dprogRefPosE = nn.utils.addSingletonDimension(dprogRefPosE:double(),2)
-    
-        -- if cuda is on than transfer all to cuda 
-    if input[1]:type() == "torch.CudaTensor" then
+  -- allocate only once
+  self.matchRowNegPos = self.matchRowNegPos or torch.FloatTensor()
+  self.maxNegPosE = self.maxNegPosE or torch.FloatTensor()
+  self.matchColRefNeg = self.matchColRefNeg or torch.FloatTensor()
+  self.maxRefNegE = self.maxRefNegE or torch.FloatTensor()
+  self.path_refPos = self.path_refPos or E_refPos:clone()
+  self.pathNonOcc_refPos = self.pathNonOcc_refPos or E_refPos:clone()
+  self.path_refPos:zero()
+  self.pathNonOcc_refPos:zero()
       
-      dprogRefNegE = dprogRefNegE:cuda()
-      dprogRefPosE = dprogRefPosE:cuda()
-      
-    end
-     
-    fwd = torch.cat({dprogRefPosE, dprogRefNegE}, 2)
+  dprog.compute(E_refPos, self.path_refPos)
+  dprog.findNonoccPath(self.path_refPos, self.pathNonOcc_refPos, self.occ_th)
   
-  end
+  -- for nonoccluded ref rows find max in refNeg
+  local indices = self.pathNonOcc_refPos:nonzero() -- valid matches
   
-  -- find rows that are simultaneously not occluded in posRef and posNeg
-  local maskBwd = torch.repeatTensor(pathNonOcc_posRef:max(2), 1, dim)
-  maskBwd:cmul(torch.repeatTensor(pathNonOcc_posNeg:max(2), 1, dim))
-  pathNonOcc_posRef:cmul(maskBwd)
-  pathNonOcc_posNeg:cmul(maskBwd)
-  
-  local bwd
-  if not torch.all(maskBwd:eq(0))   then 
-    local indices = pathNonOcc_posRef:nonzero() -- valid matches
-    local dprogPosRefE = E_refPos:t()[pathNonOcc_posRef]:clone()
-    self.activeRowsPos = indices[{{},{1}}]:clone():squeeze():float():add(-1) -- C++ style
-    self.matchColPosRef = indices[{{},{2}}]:clone():squeeze():float():add(-1)
-    indices = pathNonOcc_posNeg:nonzero() -- valid matches
-    local dprogPosNegE = E_negPos:t()[pathNonOcc_posNeg]:clone()
-    self.matchColPosNeg = indices[{{},{2}}]:clone():squeeze():float():add(-1)
-    
-    -- output is double
-    dprogPosNegE = nn.utils.addSingletonDimension(dprogPosNegE:double(),2)
-    dprogPosRefE = nn.utils.addSingletonDimension(dprogPosRefE:double(),2)
-  
+  if   indices:numel() > 0 then 
+
+    self.rows = indices:select(2,1):float():add(-1) -- C++ style
+    self.cols = indices:select(2,2):float():add(-1)
+    local dprogE = E_refPos[self.pathNonOcc_refPos:byte()]
+
+    self.maxRefNegE:resizeAs(dprogE);
+    self.matchColRefNeg:resizeAs(dprogE)
+    dprog.findMaxForRows(E_refNeg, self.rows, self.matchColRefNeg, self.maxRefNegE)
+
+    self.maxNegPosE:resizeAs(dprogE);
+    self.matchRowNegPos:resizeAs(dprogE)
+    dprog.findMaxForCols(E_negPos, self.cols, self.matchRowNegPos, self.maxNegPosE)
+
     -- if cuda is on than transfer all to cuda 
     if input[1]:type() == "torch.CudaTensor" then
-      
-      dprogPosNegE = dprogPosNegE:cuda()
-      dprogPosRefE = dprogPosRefE:cuda()
-      
+
+      self.output = {{dprogE:cuda(), self.maxRefNegE:cuda()}, {dprogE:cuda(), self.maxNegPosE:cuda()}}
+
+    else
+
+      self.output = {{dprogE:double(), self.maxRefNegE:double()}, {dprogE:double(), self.maxNegPosE:double()}}
+
     end
+
+  else
     
-    -- make output tensor
-    bwd = torch.cat({dprogPosRefE, dprogPosNegE}, 2)
+    self.output = {}
       
   end
-    
-  self.output = {fwd, bwd}
-    
+      
   -- note:
   -- 1. sometimes fwd or bwd can be empty
   -- 2. number of elements in fwd and bwd can be differenet 
@@ -131,42 +87,38 @@ end
 
 function milDprog:updateGradInput(input, gradOutput)
    
-  local gradOutput_fwd, gradOutput_bwd = unpack(gradOutput)
+  local fwd, bwd = unpack(gradOutput)
+  local dprogRefPosE_grad, dprogRefNegE_grad = unpack(fwd)
+  local dprogPosRefE_grad, dprogNegPosE_grad = unpack(bwd)
+  
   local E_refPos, E_refNeg, E_negPos = unpack(input)
-  
-  
-  local dprogPosRefE_grad = gradOutput_bwd[{{},{1}}]:squeeze():float()
-  local dprogPosNegE_grad = gradOutput_bwd[{{},{2}}]:squeeze():float()
-  
-  local dprogRefPosE_grad = gradOutput_fwd[{{},{1}}]:squeeze():float()
-  local dprogRefNegE_grad = gradOutput_fwd[{{},{2}}]:squeeze():float()  
-  
-  local distNegPos = E_negPos:float():clone():zero()
-  local distRefPos = E_refPos:float():clone():zero()
-  local distRefNeg = E_refNeg:float():clone():zero()
-  
-  dprog.collect(distRefNeg, dprogRefNegE_grad, self.matchColRefNeg, self.activeRowsRef)
-  
-  dprog.collect(distRefPos, dprogRefPosE_grad, self.matchColRefPos, self.activeRowsRef)
-  -- pos-ref is transpose of ref-pose
-  local distPosRef = distRefPos:t()
-  dprog.collect(distPosRef, dprogPosRefE_grad, self.matchColPosRef, self.activeRowsPos)
-  
-  -- pos-neg is transpose of neg-pos
-  local distPosNeg = distNegPos:t()
-  dprog.collect(distPosNeg, dprogPosNegE_grad, self.matchColPosNeg, self.activeRowsPos)
     
-  distNegPos = distNegPos:double() 
-  distRefPos = distRefPos:double() 
-  distRefNeg = distRefNeg:double() 
+  local dprogPosRefE_grad = dprogPosRefE_grad:float()
+  local dprogNegPosE_grad = dprogNegPosE_grad:float()
   
-   if input[1]:type() == "torch.CudaTensor" then 
-    distNegPos = distNegPos:cuda()
-    distRefPos = distRefPos:cuda()
-    distRefNeg = distRefNeg:cuda()
-   end
+  local dprogRefPosE_grad = dprogRefPosE_grad:float()
+  local dprogRefNegE_grad = dprogRefNegE_grad:float()  
+  
+  self.distNegPos = self.distNegPos or E_negPos:float()
+  self.distRefPos = self.distRefPos or E_refPos:float()
+  self.distRefNeg = self.distRefNeg or E_refNeg:float()
+  self.distNegPos:zero()
+  self.distRefPos:zero()
+  self.distRefNeg:zero()
+  
+  dprog.collect(self.distRefNeg, dprogRefNegE_grad, self.matchColRefNeg, self.rows)
+  
+  dprog.collect(self.distRefPos, dprogRefPosE_grad, self.cols, self.rows)
+  dprog.collect(self.distRefPos, dprogPosRefE_grad, self.cols, self.rows)
+  
+  dprog.collect(self.distNegPos, dprogNegPosE_grad, self.cols, self.matchRowNegPos)
    
-   self.gradInput = {distRefPos, distRefNeg, distNegPos}
-      
-   return self.gradInput
+  
+  if input[1]:type() == "torch.CudaTensor" then 
+      self.gradInput = {self.distRefPos:cuda(), self.distRefNeg:cuda(), self.distNegPos:cuda()}
+  else
+      self.gradInput = {self.distRefPos:double(), self.distRefNeg:double(), self.distNegPos:double()}
+  end
+   
+  return self.gradInput
 end

@@ -31,7 +31,7 @@ local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
 _BASE_FNET_, hpatch = baseNet.get(4, 64, 3)
-_TR_NET_, _CRITERION_ = netWrapper.getContrastDprog(img_w, disp_max, hpatch, 2, 0.2, _BASE_FNET_)
+_TR_NET_, _CRITERION_ = netWrapper.getMilDprog(img_w, disp_max, hpatch, 2, 0.2, _BASE_FNET_)
 _BASE_PPARAM_ = _BASE_FNET_:getParameters() 
 _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 
