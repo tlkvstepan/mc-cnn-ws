@@ -1,8 +1,9 @@
 local netWrapper = {}
 
-function netWrapper.getMilContrastDprog(img_w, disp_max, hpatch, dist_min, loss_margin, fnet)
+function netWrapper.getMilContrastDprog(img_w, disp_max, hpatch, dist_min, occ_th, loss_margin, fnet)
 
 local fNetRef = fnet:clone();
+ 
 local Net = nn.Sequential()
 
 -- pass 3 epipolar lines through feature net and normalize outputs
@@ -20,16 +21,16 @@ fNets:add(fNetNeg)
 -- compute 3 cross products: ref and pos, ref and neg, pos and neg
 local fNets2dNetCom = nn.ConcatTable()
 Net:add(fNets2dNetCom); -- feature net to distance net commutator
-local dNetRefPos_ = nn.Sequential()
+local dNetRefPos = nn.Sequential()
 local dNetRefNeg = nn.Sequential()
 local dNetNegPos = nn.Sequential()
-fNets2dNetCom:add(dNetRefPos_)
+fNets2dNetCom:add(dNetRefPos)
 fNets2dNetCom:add(dNetRefNeg)
 fNets2dNetCom:add(dNetNegPos)
 local dNetRefPosSel = nn.ConcatTable()  -- input selectors for each distance net
 local dNetRefNegSel = nn.ConcatTable()
 local dNetNegPosSel = nn.ConcatTable()
-dNetRefPos_:add(dNetRefPosSel)
+dNetRefPos:add(dNetRefPosSel)
 dNetRefNeg:add(dNetRefNegSel)
 dNetNegPos:add(dNetNegPosSel)
 dNetRefPosSel:add(nn.SelectTable(1))
@@ -38,7 +39,7 @@ dNetRefNegSel:add(nn.SelectTable(1))
 dNetRefNegSel:add(nn.SelectTable(3))
 dNetNegPosSel:add(nn.SelectTable(3))
 dNetNegPosSel:add(nn.SelectTable(2))
-dNetRefPos_:add(nn.MM(false, true))
+dNetRefPos:add(nn.MM(false, true))
 dNetRefNeg:add(nn.MM(false, true))
 dNetNegPos:add(nn.MM(false, true))
 
@@ -48,77 +49,24 @@ dNetNegPos:add(nn.MM(false, true))
 local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
 mask = torch.triu(torch.tril(mask,-1),-disp_max)
 mask = mask - 2; 
-dNetRefPos_:add(nn.addMatrix(mask))
+dNetRefPos:add(nn.addMatrix(mask))
 dNetRefNeg:add(nn.addMatrix(mask))
 dNetNegPos:add(nn.addMatrix(mask))
+-- clamp (-1, 1)
+dNetRefPos:add(nn.Clamp(-1,1))
+dNetRefNeg:add(nn.Clamp(-1,1))
+dNetNegPos:add(nn.Clamp(-1,1))
 
--- make 2 copies of refPos distance matrix, since we use will use it twice 
--- as ref-pos and pos-ref
-dNetRefPos_:add(nn.Replicate(2))
-dNetRefPos_:add(nn.SplitTable(1))
-local dNetRefPosSpl_ = nn.ParallelTable() -- splitter for ref-pos distance matrix
-dNetRefPos_:add(dNetRefPosSpl_)
-local dNetRefPos = nn.Sequential()
-local dNetPosRef = nn.Sequential()
-dNetRefPosSpl_:add(dNetRefPos)
-dNetRefPosSpl_:add(dNetPosRef)
+-- convert range to (0 1)
+dNetRefPos:add(nn.AddConstant(1))
+dNetRefPos:add(nn.MulConstant(0.5))
+dNetRefNeg:add(nn.AddConstant(1))
+dNetRefNeg:add(nn.MulConstant(0.5))
+dNetNegPos:add(nn.AddConstant(1))
+dNetNegPos:add(nn.MulConstant(0.5))
 
--- now cut parts of distance matrices, that correspond to edges of the image
--- since on the edges of the image we might not have correct matches
--- ref-neg table we cut from the top, and take max along 2 dim
-dNetRefNeg:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
--- neg-pos table we cut from the right, transpose and take max along 2 dim
-dNetNegPos:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
-dNetNegPos:add(nn.Transpose{1,2})
--- ref-pos we cut from the top
-dNetRefPos:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
--- second copy of ref-pos we cut from the right and transpose to obtain pos-ref
-dNetPosRef:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
-dNetPosRef:add(nn.Transpose{1,2})
-
--- find best dprog solution for ref-neg and neg-pos
-dNetRefNeg:add(nn.Dprog(dist_min))
-dNetNegPos:add(nn.Dprog(dist_min))
-
--- find dprog solution for ref-pos and pos-ref
--- and alternative max solution that is on minimum distance from dprog solution
-dNetRefPos:add(nn.contrastDprog(dist_min))
-dNetRefPos:add(nn.SplitTable(2))
-dNetPosRef:add(nn.contrastDprog(dist_min))
-dNetPosRef:add(nn.SplitTable(2))
-
----- flatten tables hierarchy
----- after flattening, order is following 
----- (1) ref-pos-dprog, (2) ref-pos-max, (3) pos-ref-dprog, (4) pos-ref-max, (5) ref-neg-dprog, (6) pos-neg-dprog
-Net:add(nn.FlattenTable())
-
--- make 4 output tables of tables
-local dNet2CostCom = nn.ConcatTable()
-Net:add(dNet2CostCom); -- feature net to distance net commutator
-local milFwd = nn.Sequential()
-local milBwd = nn.Sequential()
-local contrastFwd = nn.Sequential()
-local contrastBwd = nn.Sequential()
-dNet2CostCom:add(milFwd)
-dNet2CostCom:add(milBwd)
-dNet2CostCom:add(contrastFwd)
-dNet2CostCom:add(contrastBwd)
-local milFwdSel = nn.ConcatTable()  -- input selectors for cost
-local milBwdSel = nn.ConcatTable()
-local contrastFwdSel = nn.ConcatTable()  -- input selectors for each distance net
-local contrastBwdSel = nn.ConcatTable()
-milFwd:add(milFwdSel)
-milBwd:add(milBwdSel)
-contrastFwd:add(contrastFwdSel)
-contrastBwd:add(contrastBwdSel)
-milFwdSel:add(nn.SelectTable(1))  -- ref-pos-dprog
-milFwdSel:add(nn.SelectTable(5))  -- ref-neg-dprog
-milBwdSel:add(nn.SelectTable(3))  -- pos-ref-dprog
-milBwdSel:add(nn.SelectTable(6))  -- ref-neg-dprog
-contrastFwdSel:add(nn.SelectTable(1))  -- ref-pos-dprog
-contrastFwdSel:add(nn.SelectTable(2))  -- ref-pos-max
-contrastBwdSel:add(nn.SelectTable(3))  -- ref-pos-dprog
-contrastBwdSel:add(nn.SelectTable(4))  -- ref-pos-max
+-- milContrastDprog
+Net:add(nn.milContrastDprog(dist_min, occ_th))
 
 -- define criterion
 -- loss(x(+), x(-)) = max(0,  - x(+) + x(-)  + prm['loss_margin'])
@@ -126,7 +74,7 @@ local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.25):add(milBwdCst,0.25):add(contrastFwdCst,0.25):add(contrastBwdCst,0.25)
+local criterion = nn.ParallelCriterion():add(milFwdCst,1):add(milBwdCst,1):add(contrastFwdCst,1):add(contrastBwdCst,1)
 
 return Net, criterion
 
@@ -255,7 +203,7 @@ local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
 local maxFwdCst = nn.MarginRankingCriterion(loss_margin);
 local maxBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.25):add(milBwdCst,0.25):add(maxFwdCst,0.25):add(maxBwdCst,0.25)
+local criterion = nn.ParallelCriterion():add(milFwdCst,0.25):add(milBwdCst,0.25):add(maxFwdCst,0.25):add(maxBwdCst,0.25)
 
 return Net, criterion
 
@@ -367,7 +315,7 @@ milBwdSel:add(nn.SelectTable(4))  -- pos-neg-max
 
 local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.5):add(milBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(milFwdCst,1):add(milBwdCst,1)
 
 return Net, criterion
 
@@ -402,7 +350,7 @@ return Net
 
 end
 
-function netWrapper.getMilDprog(img_w, disp_max, hpatch, loss_margin, fnet)
+function netWrapper.getMilDprog(img_w, disp_max, hpatch, occ_th, loss_margin,  fnet)
 
 local fNetRef = fnet:clone();
  
@@ -423,16 +371,16 @@ fNets:add(fNetNeg)
 -- compute 3 cross products: ref and pos, ref and neg, pos and neg
 local fNets2dNetCom = nn.ConcatTable()
 Net:add(fNets2dNetCom); -- feature net to distance net commutator
-local dNetRefPos_ = nn.Sequential()
+local dNetRefPos = nn.Sequential()
 local dNetRefNeg = nn.Sequential()
 local dNetNegPos = nn.Sequential()
-fNets2dNetCom:add(dNetRefPos_)
+fNets2dNetCom:add(dNetRefPos)
 fNets2dNetCom:add(dNetRefNeg)
 fNets2dNetCom:add(dNetNegPos)
 local dNetRefPosSel = nn.ConcatTable()  -- input selectors for each distance net
 local dNetRefNegSel = nn.ConcatTable()
 local dNetNegPosSel = nn.ConcatTable()
-dNetRefPos_:add(dNetRefPosSel)
+dNetRefPos:add(dNetRefPosSel)
 dNetRefNeg:add(dNetRefNegSel)
 dNetNegPos:add(dNetNegPosSel)
 dNetRefPosSel:add(nn.SelectTable(1))
@@ -441,7 +389,7 @@ dNetRefNegSel:add(nn.SelectTable(1))
 dNetRefNegSel:add(nn.SelectTable(3))
 dNetNegPosSel:add(nn.SelectTable(3))
 dNetNegPosSel:add(nn.SelectTable(2))
-dNetRefPos_:add(nn.MM(false, true))
+dNetRefPos:add(nn.MM(false, true))
 dNetRefNeg:add(nn.MM(false, true))
 dNetNegPos:add(nn.MM(false, true))
 
@@ -451,64 +399,28 @@ dNetNegPos:add(nn.MM(false, true))
 local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
 mask = torch.triu(torch.tril(mask,-1),-disp_max)
 mask = mask - 2; 
-dNetRefPos_:add(nn.addMatrix(mask))
+dNetRefPos:add(nn.addMatrix(mask))
 dNetRefNeg:add(nn.addMatrix(mask))
 dNetNegPos:add(nn.addMatrix(mask))
+-- clamp (-1, 1)
+dNetRefPos:add(nn.Clamp(-1,1))
+dNetRefNeg:add(nn.Clamp(-1,1))
+dNetNegPos:add(nn.Clamp(-1,1))
 
--- make 2 copies of refPos distance matrix, since we use will use it twice 
--- as ref-pos and pos-ref
-dNetRefPos_:add(nn.Replicate(2))
-dNetRefPos_:add(nn.SplitTable(1))
-local dNetRefPosSpl_ = nn.ParallelTable() -- splitter for ref-pos distance matrix
-dNetRefPos_:add(dNetRefPosSpl_)
-local dNetRefPos = nn.Sequential()
-local dNetPosRef = nn.Sequential()
-dNetRefPosSpl_:add(dNetRefPos)
-dNetRefPosSpl_:add(dNetPosRef)
+-- convert range to (0 1)
+dNetRefPos:add(nn.AddConstant(1))
+dNetRefPos:add(nn.MulConstant(0.5))
+dNetRefNeg:add(nn.AddConstant(1))
+dNetRefNeg:add(nn.MulConstant(0.5))
+dNetNegPos:add(nn.AddConstant(1))
+dNetNegPos:add(nn.MulConstant(0.5))
 
--- now cut parts of distance matrices, that correspond to edges of the image
--- since on the edges of the image we might not have correct matches
--- ref-neg table we cut from the top, and take max along 2 dim
-dNetRefNeg:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
--- neg-pos table we cut from the right, transpose and take max along 2 dim
-dNetNegPos:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
-dNetNegPos:add(nn.Transpose{1,2})
--- ref-pos we cut from the top
-dNetRefPos:add(nn.Narrow(1, disp_max+1, img_w - 2*hpatch - disp_max))
--- second copy of ref-pos we cut from the right and transpose to obtain pos-ref
-dNetPosRef:add(nn.Narrow(2, 1, img_w - 2*hpatch - disp_max))
-dNetPosRef:add(nn.Transpose{1,2})
-
--- compute row-wise maximums
-dNetRefPos:add(nn.Dprog())
-dNetRefNeg:add(nn.Dprog())
-dNetPosRef:add(nn.Dprog())
-dNetNegPos:add(nn.Dprog())
-
--- flatten tables hierarchy
--- after flattening, order is following 
--- ref-pos-max, pos-ref-max, ref-neg-max, pos-neg-max
-Net:add(nn.FlattenTable())
-
--- make 2 output tables of tables
-local dNet2CostCom = nn.ConcatTable()
-Net:add(dNet2CostCom); -- feature net to distance net commutator
-local milFwd = nn.Sequential()
-local milBwd = nn.Sequential()
-dNet2CostCom:add(milFwd)
-dNet2CostCom:add(milBwd)
-local milFwdSel = nn.ConcatTable()  -- input selectors for cost
-local milBwdSel = nn.ConcatTable()
-milFwd:add(milFwdSel)
-milBwd:add(milBwdSel)
-milFwdSel:add(nn.SelectTable(1))  -- ref-pos-max
-milFwdSel:add(nn.SelectTable(3))  -- ref-neg-max
-milBwdSel:add(nn.SelectTable(2))  -- pos-ref-max
-milBwdSel:add(nn.SelectTable(4))  -- pos-neg-max
+-- milDprog
+Net:add(nn.milDprog(occ_th))
 
 local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 local milBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(milFwdCst,0.5):add(milBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(milFwdCst,1):add(milBwdCst,1)
 
 return Net, criterion
 
@@ -559,12 +471,12 @@ stream2:add(nn.SplitTable(2))
 
 local contrastFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(contrastFwdCst,0.5):add(contrastBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(contrastFwdCst,1):add(contrastBwdCst,1)
 
 return Net, criterion
 end 
 
-function netWrapper.getContrastDprog(img_w, disp_max, hpatch, dist_min, loss_margin, fnet)  
+function netWrapper.getContrastDprog(img_w, disp_max, hpatch, dist_min, occ_th, loss_margin, fnet)  
 
 local fNetRef = fnet:clone()
 local Net = nn.Sequential()
@@ -590,32 +502,32 @@ Net:add(nn.addMatrix(mask))
 -- clamp (-1, 1)
 Net:add(nn.Clamp(-1,1))
 
--- convert range to (0 -1)
+-- convert range to (0 1)
 Net:add(nn.AddConstant(1))
 Net:add(nn.MulConstant(0.5))
 
 
-Net:add(nn.contrastDprog(dist_min))
-Net:add(nn.SplitTable(2))
+Net:add(nn.contrastDprog(dist_min, occ_th))
+--Net:add(nn.SplitTable(2))
 
-local NetCom = nn.ConcatTable()
-Net:add(NetCom); -- feature net to distance net commutator
-local NetFCost = nn.Sequential()
-local NetBCost = nn.Sequential()
-NetCom:add(NetFCost)
-NetCom:add(NetBCost)
-local NetFCostSel = nn.ConcatTable()  -- input selectors for each distance net
-local NetBCostSel = nn.ConcatTable()
-NetFCost:add(NetFCostSel)
-NetBCost:add(NetBCostSel)
-NetFCostSel:add(nn.SelectTable(1))
-NetFCostSel:add(nn.SelectTable(2))
-NetBCostSel:add(nn.SelectTable(1))
-NetBCostSel:add(nn.SelectTable(3))
+--local NetCom = nn.ConcatTable()
+--Net:add(NetCom); -- feature net to distance net commutator
+--local NetFCost = nn.Sequential()
+--local NetBCost = nn.Sequential()
+--NetCom:add(NetFCost)
+--NetCom:add(NetBCost)
+--local NetFCostSel = nn.ConcatTable()  -- input selectors for each distance net
+--local NetBCostSel = nn.ConcatTable()
+--NetFCost:add(NetFCostSel)
+--NetBCost:add(NetBCostSel)
+--NetFCostSel:add(nn.SelectTable(1))
+--NetFCostSel:add(nn.SelectTable(2))
+--NetBCostSel:add(nn.SelectTable(1))
+--NetBCostSel:add(nn.SelectTable(3))
 
 local contrastiveFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastiveBwdCst = nn.MarginRankingCriterion(loss_margin);
-local criterion = nn.ParallelCriterion(true):add(contrastiveFwdCst,0.5):add(contrastiveBwdCst,0.5)
+local criterion = nn.ParallelCriterion():add(contrastiveFwdCst,1):add(contrastiveBwdCst,1)
 
 --Net:add(nn.JoinTable(1))
 --Net:add(nn.SplitTable(2))

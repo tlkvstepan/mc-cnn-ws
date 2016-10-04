@@ -7,6 +7,7 @@ extern "C" {
 #include <limits>
 #include <cmath>
 #include <algorithm>    //min
+#include <omp.h>
 
 #include <stdio.h>
 
@@ -71,6 +72,7 @@ void accumulate(const float *E, float *pathE, float *pathLen, float *traceBack, 
   int nb_neig = 3;
   
   // start from first column
+  #pragma omp parallel for num_threads(8)
   for( int nrow = 0; nrow < h; ++nrow )
   {
     int idx = SUB2IND_2D_TORCH(0, nrow, w, h);
@@ -151,6 +153,7 @@ int findMaxForRows(lua_State *L)
     float *matchIdx = THFloatTensor_data(matchIdx_);         
     float *matchE = THFloatTensor_data(matchE_);         
     
+    #pragma omp parallel for num_threads(8)
     for( int nrow = 0; nrow < n; ++nrow ) {
       float bestCol = 0;
       float maxE = -HUGE_VALF; 
@@ -186,6 +189,7 @@ int findMaxForCols(lua_State *L)
     float *matchIdx = THFloatTensor_data(matchIdx_);         
     float *matchE = THFloatTensor_data(matchE_);         
     
+    #pragma omp parallel for num_threads(8)
     for( int ncol = 0; ncol < n; ++ncol ) {
       float bestRow = 0;
       float maxE = -HUGE_VALF; 
@@ -221,6 +225,7 @@ int collect(lua_State *L)
     float *col = THFloatTensor_data(col_);         
     float *row = THFloatTensor_data(row_);              
     
+    #pragma omp parallel for num_threads(8)
     for( int i = 0; i < n; ++i ) {
       int idx = SUB2IND_2D_TORCH(col[i], row[i], w, h);
       mat[idx] = val[i];
@@ -256,6 +261,7 @@ int maskE(lua_State *L)
         
         if( path[idx] == 1 ) {
           
+          #pragma omp parallel for num_threads(8)
           for( int dy = -distMin; dy <= distMin; ++dy )
           for( int dx = -distMin; dx <= distMin; ++dx ){  
             
@@ -285,7 +291,8 @@ int findNonoccPath(lua_State *L)
     // input
     THFloatTensor *path_ = (THFloatTensor*)luaT_checkudata(L, 1, "torch.FloatTensor");
     THFloatTensor *pathNonOcc_ = (THFloatTensor*)luaT_checkudata(L, 2, "torch.FloatTensor");
-    
+    float occTh = luaL_checknumber(L, 3);
+        
     int w = THFloatTensor_size(path_, 1);
     int h = THFloatTensor_size(path_, 0);
 
@@ -312,7 +319,7 @@ int findNonoccPath(lua_State *L)
        pathNonOcc[idx] = path[idx];
        if( path[idx] == 1 )
        {
-          if( sumCol[ncol] > 1 || sumRow[nrow] > 1 )
+          if( sumCol[ncol] > occTh || sumRow[nrow] > occTh )
           {
             pathNonOcc[idx] = 0;
           }
@@ -332,8 +339,8 @@ int compute(lua_State *L)
 {
     // input
     THFloatTensor *E_ = (THFloatTensor*)luaT_checkudata(L, 1, "torch.FloatTensor");
-    THFloatTensor *aE_ = (THFloatTensor*)luaT_checkudata(L, 3, "torch.FloatTensor");
-    THFloatTensor *aS_ = (THFloatTensor*)luaT_checkudata(L, 4, "torch.FloatTensor");
+    //THFloatTensor *aE_ = (THFloatTensor*)luaT_checkudata(L, 3, "torch.FloatTensor");
+    //THFloatTensor *aS_ = (THFloatTensor*)luaT_checkudata(L, 4, "torch.FloatTensor");
     
     // output
     THFloatTensor *pathOpt_  = (THFloatTensor*)luaT_checkudata(L, 2, "torch.FloatTensor");
@@ -343,8 +350,10 @@ int compute(lua_State *L)
    
     float *E = THFloatTensor_data(E_);                // Energy
     float *pathOpt = THFloatTensor_data(pathOpt_);          // Optimal path
-    float *aE = THFloatTensor_data(aE_);
-    float *aS = THFloatTensor_data(aS_);
+    //float *aE = THFloatTensor_data(aE_);
+    //float *aS = THFloatTensor_data(aS_);
+    float *aE = new float[w*h];
+    float *aS = new float[w*h];
     
     float *traceBack = new float[h*w];
         
@@ -353,7 +362,8 @@ int compute(lua_State *L)
         
  //   delete[] aE;
     delete[] traceBack;
-   
+    delete[] aE;
+    delete[] aS;
    return 0;
 }
 
