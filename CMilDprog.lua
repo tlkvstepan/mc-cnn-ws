@@ -12,6 +12,7 @@ local milDprog, parent = torch.class('nn.milDprog', 'nn.Module')
 
 function milDprog:__init(occ_th)
    parent.__init(self)
+   
    self.occ_th = occ_th
    -- self.cols 
    -- self.rows 
@@ -40,7 +41,14 @@ function milDprog:updateOutput(input)
   self.path_refPos:zero()
   self.pathNonOcc_refPos:zero()
       
-  dprog.compute(E_refPos, self.path_refPos)
+  self.aE  = self.aE  or input:clone():float()    
+  self.aS = self.aS or input:clone():float()
+  self.traceBack  = self.traceBack  or input:clone():float()
+  self.aE:zero()
+  self.aS:zero()
+  self.traceBack:zero()
+  
+  dprog.compute(E_refPos, self.path_refPos, self.aE, self.aS, self.traceBack)
   dprog.findNonoccPath(self.path_refPos, self.pathNonOcc_refPos, self.occ_th)
   
   -- for nonoccluded ref rows find max in refNeg
@@ -105,6 +113,7 @@ function milDprog:updateGradInput(input, gradOutput)
   self.distNegPos:zero()
   self.distRefPos:zero()
   self.distRefNeg:zero()
+  
   
   dprog.collect(self.distRefNeg, dprogRefNegE_grad, self.matchColRefNeg, self.rows)
   

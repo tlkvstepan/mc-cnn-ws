@@ -60,7 +60,14 @@ function milContrastDprog:updateOutput(input)
   self.path_refPos:zero()
   self.pathNonOcc_refPos:zero()
       
-  dprog.compute(E_refPos, self.path_refPos)
+  self.aE  = self.aE  or input:clone():float()    
+  self.aS = self.aS or input:clone():float()
+  self.traceBack  = self.traceBack  or input:clone():float()
+  self.aE:zero()
+  self.aS:zero()
+  self.traceBack:zero()
+        
+  dprog.compute(E_refPos, self.path_refPos, self.aE, self.aS, self.traceBack)
   dprog.findNonoccPath(self.path_refPos, self.pathNonOcc_refPos, self.occ_th)
   dprog.maskE(self.pathNonOcc_refPos, E_refPos_masked, self.distMin)
 

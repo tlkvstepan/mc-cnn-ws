@@ -16,21 +16,34 @@ require 'torch'
 
 -- |read input parameters|
 -- fist argument is training net architecture
-arch = table.remove(arg, 1) 
+debug = table.remove(arg, 1) 
+if debug == 'debug' then
+  arch = table.remove(arg, 1) 
+  debug = true
+else
+  arch = debug
+  debug = false
+end
+
+print(debug)
+print(arch)
+
 cmd = torch.CmdLine()
 
 assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
-cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
-cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
-cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
---cmd:option('-valid_set_size', 10)        -- 100 epi lines      
---cmd:option('-train_batch_size', 30)      -- 342 one image in KITTI
---cmd:option('-train_epoch_size', 30*1)  -- 342*389 all images in KITTI
---cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
-
+if not debug then
+  cmd:option('-vali  d_set_size', 100)        -- 100 epi lines      
+  cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
+  cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
+  cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
+else
+  cmd:option('-valid_set_size', 100)        -- 100 epi lines      
+  cmd:option('-train_batch_size', 128)      -- 342 one image in KITTI
+  cmd:option('-train_epoch_size', 128*10)  -- 342*389 all images in KITTI
+  cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
+end
 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
@@ -44,7 +57,7 @@ cmd:option('-net_nb_layers', 4)
 
 -- debug
 cmd:option('-debug_err_th', 3)
-cmd:option('-debug_fname', 'test1')
+cmd:option('-debug_fname', 'test')
 cmd:option('-debug_gpu_on', true)
 cmd:option('-debug_save_on', true)
 cmd:option('-debug_start_from_fnet', '')
@@ -312,10 +325,10 @@ if prm['debug_save_on'] then
     
     local distMat, gtDistMat = testFun.getDist(distNet, {_VA_INPUT_[1][{{lines[nline]},{},{}}], _VA_INPUT_[2][{{lines[nline]},{},{}}]}, _VA_TARGET_[{{lines[nline]},{},{}}], prm['debug_err_th'])
 
-    local gtDistMat = 1-utils.scale2_01(gtDistMat)
+    local gtDistMat = -utils.scale2_01(gtDistMat)+1
 
     local distMat = utils.softmax(distMat:squeeze())
-    local distMat = 1-utils.scale2_01(distMat)
+    local distMat = -utils.scale2_01(distMat)+1
 
     local r = distMat:clone()
     local g = distMat:clone()
