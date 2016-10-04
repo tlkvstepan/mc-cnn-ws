@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task 1
 #SBATCH --mem 16384
 #SBATCH --time 24:00:00
-#SBATCH --qos gpu
+#SBATCH --qos=gpu_free
 #SBATCH --gres gpu:1
 #SBATCH --partition=gpu
 echo TRAIN MIL_DPROG STARTING AT `date`
