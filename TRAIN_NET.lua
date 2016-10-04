@@ -16,17 +16,17 @@ require 'torch'
 
 -- |read input parameters|
 -- fist argument is training net architecture
-debug = table.remove(arg, 1) 
-if debug == 'debug' then
+dbg = table.remove(arg, 1) 
+if dbg == 'debug' then
   arch = table.remove(arg, 1) 
-  debug = true
+  dbg = true
 else
-  arch = debug
-  debug = false
+  arch = dbg
+  dbg = false
 end
 
-print(debug)
-print(arch)
+--print(dbg)
+--print(arch)
 
 cmd = torch.CmdLine()
 
@@ -40,8 +40,8 @@ if not debug then
   cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
 else
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 128)      -- 342 one image in KITTI
-  cmd:option('-train_epoch_size', 128*10)  -- 342*389 all images in KITTI
+  cmd:option('-train_batch_size', 16)      -- 342 one image in KITTI
+  cmd:option('-train_epoch_size', 16*10)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
 end
 
@@ -247,8 +247,7 @@ end
 -- |define logger|
 if prm['debug_save_on'] then
   logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
-  logger:setNames{'Training loss', 
-    'Accuracy (<3 disparity err)'}
+  logger:setNames{'Training loss', 'Accuracy (<3 disparity err)'}
   logger:style{'+-', '+-'}
 end    
 
