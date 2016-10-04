@@ -34,7 +34,7 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 
 -- optimization parameters parameters
 if not debug then
-  cmd:option('-vali  d_set_size', 100)        -- 100 epi lines      
+  cmd:option('-valid_set_size', 100)        -- 100 epi lines      
   cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
   cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
