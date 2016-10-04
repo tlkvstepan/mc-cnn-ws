@@ -5,7 +5,7 @@ require 'nn'
 utils = dofile('utils.lua')
   
 distMin = 2;  
-local input = image.load('dprog_test.png',1,'byte'):float()
+local input = image.load('test_dprog.png',1,'byte'):float()
 
 local E = input:clone():float()
 local E_masked = input:clone():float()
@@ -15,9 +15,10 @@ local dim = input:size(1)
 
 local aE = input:clone():zero():float()
 local aS = input:clone():zero():float()
+local traceBack = input:clone():zero():float()
 
-dprog.compute(E, path, aE, aS)
-dprog.findNonoccPath(path, pathNonOcc)
+dprog.compute(E, path, aE, aS, traceBack)
+dprog.findNonoccPath(path, pathNonOcc,2)
 dprog.maskE(pathNonOcc, E_masked, distMin)
 
 indices = pathNonOcc:nonzero() -- valid matches

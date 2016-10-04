@@ -7,7 +7,6 @@ require 'cunn'
 dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to the input (I use it for masking purposes)
 
 require 'libdprog'                        -- C++ module for dynamic programming
-dofile('CDprog.lua');                     -- Dynamic programming module
 dofile('CContrastDprog.lua');             -- Contrastive dynamic programming module
 dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
 
@@ -29,6 +28,9 @@ local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.
 
 local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
+
+math.randomseed(0); 
+torch.manualSeed(0)
 
 _BASE_FNET_, hpatch = baseNet.get(4, 64, 3)
 _TR_NET_, _CRITERION_ = netWrapper.getMilDprog(img_w, disp_max, hpatch, 2, 0.2, _BASE_FNET_)

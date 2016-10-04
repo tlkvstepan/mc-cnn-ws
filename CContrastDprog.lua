@@ -11,10 +11,11 @@
 
 local contrastDprog, parent = torch.class('nn.contrastDprog', 'nn.Module')
 
-function contrastDprog:__init(distMin, occTh)
+function contrastDprog:__init(distMin, occTh, mask)
    parent.__init(self)
    self.distMin = distMin
    self.occTh = occTh 
+   self.mask = mask
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
    self.cols = torch.Tensor()
    self.rows = torch.Tensor()
@@ -33,14 +34,21 @@ function contrastDprog:updateOutput(input)
   self.colwiseMaxE = self.colwiseMaxE or  torch.FloatTensor()    
   self.rowwiseMaxI  = self.rowwiseMaxI  or torch.FloatTensor()    
   self.colwiseMaxI = self.colwiseMaxI or torch.FloatTensor()
-  
+      
   self.path = self.path or input:clone():float()     
   self.path:zero()
   
   self.pathNonOcc = self.pathNonOcc or input:clone():float()
   self.pathNonOcc:zero()
+  
+  self.aE  = self.aE  or input:clone():float()    
+  self.aS = self.aS or input:clone():float()
+  self.traceBack  = self.traceBack  or input:clone():float()
+  self.aE:zero()
+  self.aS:zero()
+  self.traceBack:zero()
       
-  dprog.compute(E, self.path)
+  dprog.compute(E, self.path,  self.aE, self.aS, self.traceBack)
   dprog.findNonoccPath(self.path, self.pathNonOcc, self.occTh)
   dprog.maskE(self.pathNonOcc, E_masked, self.distMin)
 
