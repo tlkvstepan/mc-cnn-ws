@@ -66,8 +66,11 @@ function milContrastDprog:updateOutput(input)
   self.aE:zero()
   self.aS:zero()
   self.traceBack:zero()
-        
+  
+  t = os.clock()
   dprog.compute(E_refPos, self.path_refPos, self.aE, self.aS, self.traceBack)
+  print(string.format("elapsed time: %.2f\n", os.clock() - t))
+  
   dprog.findNonoccPath(self.path_refPos, self.pathNonOcc_refPos, self.occ_th)
   dprog.maskE(self.pathNonOcc_refPos, E_refPos_masked, self.distMin)
 

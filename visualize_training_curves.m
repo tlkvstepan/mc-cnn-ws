@@ -50,7 +50,7 @@ legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
 % contrast-dprog
 figure;
 title('contrast-dprog net')
-logContrastDprogFile = 'work/contrast-dprog/contrast-dprog-2016_10_03_09:32:23'
+logContrastDprogFile = 'work/contrast-dprog/contrast-dprog-2016_10_04_14:31:25'
 logContrastDprog = dlmread(logContrastDprogFile, ' ', 1, 1)
 yyaxis left
 plot(logContrastDprog(:,1)); hold on

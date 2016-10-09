@@ -26,59 +26,68 @@ end
 
 function contrastDprog:updateOutput(input)
   
-  local E = input:float()
-  local E_masked = E:clone()
+  local dim = input:size(1)
+
   
-  -- allocate local arrays only once
-  self.rowwiseMaxE = self.rowwiseMaxE or  torch.FloatTensor()
-  self.colwiseMaxE = self.colwiseMaxE or  torch.FloatTensor()    
-  self.rowwiseMaxI  = self.rowwiseMaxI  or torch.FloatTensor()    
-  self.colwiseMaxI = self.colwiseMaxI or torch.FloatTensor()
-      
-  self.path = self.path or input:clone():float()     
-  self.path:zero()
-  
-  self.pathNonOcc = self.pathNonOcc or input:clone():float()
+  self.pathNonOcc = self.pathNonOcc or input:clone() -- cuda if cuda mode
   self.pathNonOcc:zero()
   
+  -- dprog (always on cpu)
+  self.path = self.path or input:clone():float()     
+  self.path:zero()
+  self.E = self.E or input:clone():float()
+  self.E:copy(input)
   self.aE  = self.aE  or input:clone():float()    
   self.aS = self.aS or input:clone():float()
   self.traceBack  = self.traceBack  or input:clone():float()
   self.aE:zero()
   self.aS:zero()
   self.traceBack:zero()
-      
-  dprog.compute(E, self.path,  self.aE, self.aS, self.traceBack)
-  dprog.findNonoccPath(self.path, self.pathNonOcc, self.occTh)
-  dprog.maskE(self.pathNonOcc, E_masked, self.distMin)
-
-  local indices = self.pathNonOcc:nonzero() -- valid matches
+  dprog.compute(self.E, self.path,  self.aE, self.aS, self.traceBack)
   
+  -- mask occluded
+  self.pathNonOcc:copy(self.path)
+  local mask = torch.repeatTensor(self.pathNonOcc:sum(2):gt(self.occTh), 1, dim)
+  mask:add(torch.repeatTensor(self.pathNonOcc:sum(1):gt(self.occTh), dim, 1)):gt(0)
+  self.pathNonOcc[mask] = 0;
+  local dprogE = input[self.pathNonOcc:byte()]
+  
+  local E_masked = input -- cuda if cuda mode
+  local E_masked_VEC = E_masked:view(dim*dim)
+  local indices = self.pathNonOcc:float():nonzero()
+  if( input:type() == "torch.CudaTensor"  )then
+    indices = indices:cuda()
+  end
+  
+  -- if there are nonoccluded path segments
   if indices:numel() > 0 then
-
-    self.rows = indices:select(2,1):float():add(-1) -- C++ style
-    self.cols = indices:select(2,2):float():add(-1)
     
-    local dprogE = E[self.pathNonOcc:byte()]
-    local dim = dprogE:numel()
-    self.rowwiseMaxI:resizeAs(dprogE)
-    self.rowwiseMaxE:resizeAs(dprogE)
-    self.colwiseMaxI:resizeAs(dprogE)
-    self.colwiseMaxE:resizeAs(dprogE)
-    dprog.findMaxForRows(E_masked, self.rows, self.rowwiseMaxI, self.rowwiseMaxE)
-    dprog.findMaxForCols(E_masked, self.cols, self.colwiseMaxI, self.colwiseMaxE)
-
-    -- if cuda is on than transfer all to cuda 
-    if input:type() == "torch.CudaTensor" then
-      
-      self.output = {{dprogE:cuda(), self.rowwiseMaxE:cuda()}, {dprogE:cuda(), self.colwiseMaxE:cuda()}}
-  
-    else
-
-      self.output = {{dprogE:double(), self.rowwiseMaxE:double()}, {dprogE:double(), self.colwiseMaxE:double()}}
-  
+    self.rows = indices:select(2,1)
+    self.cols = indices:select(2,2)
+    for dy = -self.distMin,self.distMin do
+      local rowsMask = self.rows + dy;
+      rowsMask[rowsMask:gt(dim)] = dim;
+      rowsMask[rowsMask:lt(1)] = 1;
+      for dx = -self.distMin,self.distMin do
+        local colsMask = self.cols + dx;
+        colsMask[colsMask:gt(dim)] = dim;
+        colsMask[colsMask:lt(1)] = 1;
+        local idx = colsMask + (rowsMask-1)*dim
+        E_masked_VEC:indexFill(1, idx, -1/0)
+      end
     end
+
+    -- compute maximum
+    self.rowwiseMaxE, self.rowwiseMaxI = E_masked:max(2)
+    self.rowwiseMaxE = self.rowwiseMaxE:index(1,self.rows):squeeze()
+    self.rowwiseMaxI = self.rowwiseMaxI:index(1,self.rows):squeeze()
+    self.colwiseMaxE, self.colwiseMaxI = E_masked:max(1)
+    self.colwiseMaxE = self.colwiseMaxE:index(2,self.cols):squeeze()
+    self.colwiseMaxI = self.colwiseMaxI:index(2,self.cols):squeeze()
     
+    -- if cuda is on than transfer all to cuda 
+    self.output = {{dprogE, self.rowwiseMaxE}, {dprogE, self.colwiseMaxE}}
+  
   else
    
     self.output = {}
@@ -95,19 +104,20 @@ function contrastDprog:updateGradInput(input, gradOutput)
    local gradOutput_dprog2, gradOutput_col = unpack(bwd)
    
    -- pass input gradient to dyn prog and max 
-   self.gradInput = self.gradInput:resizeAs(input):zero():float()
+   self.gradInput = self.gradInput:resizeAs(input):zero() -- same type as input
+   local dim = input:size(1);
+   local gradInput_vec = self.gradInput:view(dim*dim) 
+   local idx;
    
-   dprog.collect(self.gradInput, gradOutput_dprog1:float(), self.cols, self.rows)
-   dprog.collect(self.gradInput, gradOutput_row:float(), self.rowwiseMaxI, self.rows)
+   idx = (self.cols) + (self.rows-1)*dim;
+   gradInput_vec:indexAdd(1, idx, gradOutput_dprog1)
+   gradInput_vec:indexAdd(1, idx, gradOutput_dprog2)
+  
+   idx = (self.rowwiseMaxI) + (self.rows-1)*dim;
+   gradInput_vec:indexAdd(1, idx, gradOutput_row)
    
-   dprog.collect(self.gradInput, gradOutput_dprog2:float(), self.cols, self.rows)
-   dprog.collect(self.gradInput, gradOutput_col:float(), self.cols, self.colwiseMaxI)
-    
-   if input:type() == "torch.CudaTensor" then 
-    self.gradInput = self.gradInput:cuda()
-   else
-    self.gradInput = self.gradInput:double() 
-   end
-      
+   idx = (self.cols) + (self.colwiseMaxI-1)*dim;
+   gradInput_vec:indexAdd(1, idx, gradOutput_col)
+   
    return self.gradInput
 end

@@ -15,11 +15,11 @@ cmd = torch.CmdLine()
 -- test parameters parameters
 cmd:option('-valid_set_size', 100) -- we use different data for test and validation       
 cmd:option('-test_set_size', 342*10)       
-cmd:option('-test_result_fname', 'test-mil-contrast-max')
+cmd:option('-test_result_fname', 'test-contrast-max')
 cmd:option('-test_err_th', 3)
 
 -- feature network parameters
-cmd:option('-net_fname', 'work/mil-contrast-max/fnet_2016_10_03_08:21:21_mil-contrast-max.t7')
+cmd:option('-net_fname', 'work/contrast-max/fnet_2016_09_29_12:57:49_contrast-max.t7')
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
