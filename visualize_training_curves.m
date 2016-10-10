@@ -50,8 +50,10 @@ legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
 % contrast-dprog
 figure;
 title('contrast-dprog net')
-logContrastDprogFile = 'work/contrast-dprog/contrast-dprog-2016_10_04_14:31:25'
-logContrastDprog = dlmread(logContrastDprogFile, ' ', 1, 1)
+logContrastDprogFile1 = 'work/contrast-dprog-occ8/contrast-dprog-occ8-2016_10_07_18:34:41'
+logContrastDprogFile2 = 'work/contrast-dprog-occ8/contrast-dprog-occ8-2016_10_09_22:03:19'
+
+logContrastDprog = [dlmread(logContrastDprogFile1, ' ', 1, 1); dlmread(logContrastDprogFile2, ' ', 1, 1)]
 yyaxis left
 plot(logContrastDprog(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')

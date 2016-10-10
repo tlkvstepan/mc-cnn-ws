@@ -4,7 +4,7 @@ close all;
 figure;
 title('Occlusion threshold selection')
 occ1File = 'work/contrast-dprog/contrast-dprog-2016_10_04_14:31:25'
-occ8File = 'work/contrast-dprog-occ8/contrast-dprog-occ8-2016_10_07_18:34:41'
+occ8File = 'work/contrast-dprog-occ8/contrast-dprog-occ8-2016_10_09_22:03:19'
 
 logOcc1 = dlmread(occ1File, ' ', 1, 1)
 logOcc8 = dlmread(occ8File, ' ', 1, 1)

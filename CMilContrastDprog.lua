@@ -13,113 +13,103 @@ local milContrastDprog, parent = torch.class('nn.milContrastDprog', 'nn.Module')
 function milContrastDprog:__init(distMin, occ_th)
    parent.__init(self)
    
-   self.occ_th = occ_th
+   self.occTh = occ_th
    self.distMin = distMin
    
    --- ref-pos dprog match
    self.cols = torch.Tensor() 
    self.rows = torch.Tensor() 
-   
---   -- ref-pos 2d max row-wise match
---   self.max2ColRefPos = torch.Tensor() 
-   
---   -- ref-pos 2d max col-wise match
---   self.max2RowRefPos = torch.Tensor() 
-   
---   --- ref-neg row-wise max match
---   self.maxRowRefNeg= torch.Tensor()
-   
---   --- neg-pos col-wise max match
---   self.maxColNegPos = torch.Tensor()
 
 end
 
 function milContrastDprog:updateOutput(input)
   
   local E_refPos, E_refNeg, E_negPos = unpack(input)
+  local dim = E_refPos:size(1)
+  local gpu_on = E_refPos:type() == "torch.CudaTensor"
   
-  E_refPos = E_refPos:float()
-  E_refNeg = E_refNeg:float()
-  E_negPos = E_negPos:float()
-  local E_refPos_masked = E_refPos:clone()
-  
-  -- allocate only once
-  self.max2InRowE = self.max2InRowE or  torch.FloatTensor()
-  self.max2InColE = self.max2InColE or  torch.FloatTensor()    
-  self.max2InRowI  = self.max2InRowI  or torch.FloatTensor()    
-  self.max2InColI = self.max2InColI or torch.FloatTensor()
-    
-  self.maxInNegPosColI = self.maxInNegPosColI or torch.FloatTensor()
-  self.maxInNegPosColE = self.maxInNegPosColE or torch.FloatTensor()
-  self.maxInRefNegRowI = self.maxInRefNegRowI or torch.FloatTensor()
-  self.maxInRefNegRowE = self.maxInRefNegRowE or torch.FloatTensor()
-  
-  self.path_refPos = self.path_refPos or E_refPos:clone()
-  self.pathNonOcc_refPos = self.pathNonOcc_refPos or E_refPos:clone()
-  
+  -- dprog (always on cpu)
+  self.path_refPos = self.path_refPos or E_refPos:float()     
   self.path_refPos:zero()
-  self.pathNonOcc_refPos:zero()
-      
-  self.aE  = self.aE  or E_refPos:clone()
-  self.aS = self.aS or E_refPos:clone()
-  self.traceBack  = self.traceBack  or E_refPos:clone()
+  self.E_refPos = self.E_refPos or E_refPos:float()
+  self.E_refPos:copy(E_refPos) -- copy input GPU to CPU if cuda mode
+  self.aE  = self.aE  or E_refPos:float()    
+  self.aS = self.aS or E_refPos:float()
+  self.traceBack  = self.traceBack  or E_refPos:float()
   self.aE:zero()
   self.aS:zero()
   self.traceBack:zero()
-  
-  t = os.clock()
-  dprog.compute(E_refPos, self.path_refPos, self.aE, self.aS, self.traceBack)
-  print(string.format("elapsed time: %.2f\n", os.clock() - t))
-  
-  dprog.findNonoccPath(self.path_refPos, self.pathNonOcc_refPos, self.occ_th)
-  dprog.maskE(self.pathNonOcc_refPos, E_refPos_masked, self.distMin)
+  dprog.compute(self.E_refPos, self.path_refPos, self.aE, self.aS, self.traceBack)
 
-  -- for nonoccluded ref rows find max in refNeg
-  local indices = self.pathNonOcc_refPos:nonzero() -- valid matches
+  -- mask occluded (on GPU if avaliable)
+  self.pathNonOcc_refPos = self.pathNonOcc_refPos or E_refPos:clone() -- cuda if cuda mode
+  self.pathNonOcc_refPos:copy(self.path_refPos)
+  local mask = torch.repeatTensor(self.pathNonOcc_refPos:sum(2):gt(self.occTh), 1, dim)
+  mask:add(torch.repeatTensor(self.pathNonOcc_refPos:sum(1):gt(self.occTh), dim, 1))
+  self.pathNonOcc_refPos[mask] = 0;
+  local dprogE = E_refPos[self.pathNonOcc_refPos:byte()] -- this basically copy
   
-  if indices:numel() > 0 then 
-
-    self.rows = indices:select(2,1):float():add(-1) -- C++ style
-    self.cols = indices:select(2,2):float():add(-1)
-    local dprogE = E_refPos[self.pathNonOcc_refPos:byte()]
-
+  -- find nooccluded rows / cols 
+  local indices = self.pathNonOcc_refPos:float():nonzero() -- cuda not supported for this opperation
+  
+  -- if there are nonoccluded segments
+  if( indices:numel() > 0 ) then
+    
+    if( gpu_on ) then
+      
+      indices = indices:cuda()
+    
+    end
+    
+    self.rows = indices:select(2,1)
+    self.cols = indices:select(2,2)
+    
+    -- mask energy array
+    local E_refPos_masked = E_refPos -- cuda if cuda mode
+    local E_refPos_masked_vec = E_refPos_masked:view(dim*dim)
+    for dy = -self.distMin, self.distMin do
+      
+      local rowsMask = self.rows + dy;
+      rowsMask[rowsMask:gt(dim)] = dim;
+      rowsMask[rowsMask:lt(1)] = 1;
+      
+      for dx = -self.distMin,self.distMin do
+      
+        local colsMask = self.cols + dx;
+        colsMask[colsMask:gt(dim)] = dim;
+        colsMask[colsMask:lt(1)] = 1;
+        local idx = colsMask + (rowsMask-1)*dim
+        E_refPos_masked_vec:indexFill(1, idx, -1/0)
+     
+      end
+    end
+    
     -- mil forward
-    self.maxInRefNegRowE:resizeAs(dprogE);
-    self.maxInRefNegRowI:resizeAs(dprogE)
-    dprog.findMaxForRows(E_refNeg, self.rows, self.maxInRefNegRowI, self.maxInRefNegRowE)
-
+    self.maxInRefNegRowE, self.maxInRefNegRowI = E_refNeg:max(2)
+    self.maxInRefNegRowE = self.maxInRefNegRowE:index(1,self.rows):squeeze()
+    self.maxInRefNegRowI = self.maxInRefNegRowI:index(1,self.rows):squeeze()
+    
     -- mil backward
-    self.maxInNegPosColE:resizeAs(dprogE);
-    self.maxInNegPosColI:resizeAs(dprogE)
-    dprog.findMaxForCols(E_negPos, self.cols, self.maxInNegPosColI, self.maxInNegPosColE)
+    self.maxInNegPosColE, self.maxInNegPosColI = E_negPos:max(1)
+    self.maxInNegPosColE = self.maxInNegPosColE:index(2,self.cols):squeeze()
+    self.maxInNegPosColI = self.maxInNegPosColI:index(2,self.cols):squeeze()
     
     --- contrast forward
-    self.max2InRowE:resizeAs(dprogE)
-    self.max2InRowI:resizeAs(dprogE)
-    dprog.findMaxForRows(E_refPos_masked, self.rows, self.max2InRowI, self.max2InRowE)
+    self.max2InRowE, self.max2InRowI = E_refPos_masked:max(2)
+    self.max2InRowE = self.max2InRowE:index(1,self.rows):squeeze()
+    self.max2InRowI = self.max2InRowI:index(1,self.rows):squeeze()
     
     -- contrast backward
-    self.max2InColE:resizeAs(dprogE)
-    self.max2InColI:resizeAs(dprogE)
-    dprog.findMaxForCols(E_refPos_masked, self.cols, self.max2InColI, self.max2InColE)
+    self.max2InColE, self.max2InColI = E_refPos_masked:max(1)
+    self.max2InColE = self.max2InColE:index(2,self.cols):squeeze()
+    self.max2InColI = self.max2InColI:index(2,self.cols):squeeze()
+    
 
-    -- if cuda is on than transfer all to cuda 
-    if input[1]:type() == "torch.CudaTensor" then
-
-      self.output = {{dprogE:cuda(), self.maxInRefNegRowE:cuda()}, 
-                     {dprogE:cuda(), self.maxInNegPosColE:cuda()},
-                     {dprogE:cuda(), self.max2InRowE:cuda()}, 
-                     {dprogE:cuda(), self.max2InColE:cuda()}}
-
-    else
-
-      self.output = {{dprogE:double(), self.maxInRefNegRowE:double()}, 
-                     {dprogE:double(), self.maxInNegPosColE:double()},
-                     {dprogE:double(), self.max2InRowE:double()},
-                     {dprogE:double(), self.max2InColE:double()}}
-
-    end
-
+    self.output = {{dprogE, self.maxInRefNegRowE},  -- mil fwd 
+                   {dprogE, self.maxInNegPosColE},  -- mil bwd
+                   {dprogE, self.max2InRowE}, -- contrast fwd
+                   {dprogE, self.max2InColE}} -- contrast bwd
+    
   else
     
     self.output = {}
@@ -127,7 +117,7 @@ function milContrastDprog:updateOutput(input)
   end
       
   -- note:
-  -- 1. sometimes fwd or bwd can be empty
+  -- 1. sometimes output is empty
   -- 2. number of elements in fwd and bwd can be differenet 
   
   return self.output
@@ -137,39 +127,50 @@ end
 function milContrastDprog:updateGradInput(input, gradOutput)
    
   local fwdMil, bwdMil, fwdContrast, bwdContrast = unpack(gradOutput)
-  local dprogE_grad1, maxInRefNegRowE_grad = unpack(fwdMil)
-  local dprogE_grad2, maxInNegPosColE_grad = unpack(bwdMil)
-  local dprogE_grad3, max2InRowE_grad = unpack(fwdContrast)
-  local dprogE_grad4, max2InColE_grad = unpack(bwdContrast)  
+ 
+  local ogradDprogE1, ogradMaxInRefNegRowE = unpack(fwdMil)
+  local ogradDprogE2, ogradMaxInNegPosColE = unpack(bwdMil)
+  local ogradDprogE3, ogradMax2InRowE = unpack(fwdContrast)
+  local ogradDprogE4, ogradMax2InColE = unpack(bwdContrast)  
   
   local E_refPos, E_refNeg, E_negPos = unpack(input)
-    
-   
-  self.distNegPos = self.distNegPos or E_negPos:float()
-  self.distRefPos = self.distRefPos or E_refPos:float()
-  self.distRefNeg = self.distRefNeg or E_refNeg:float()
-  self.distNegPos:zero()
-  self.distRefPos:zero()
-  self.distRefNeg:zero()
+  local dim = E_refPos:size(1) 
   
-  -- mil frw
-  dprog.collect(self.distRefNeg, maxInRefNegRowE_grad:float(), self.maxInRefNegRowI, self.rows)
-  dprog.collect(self.distRefPos, dprogE_grad1:float(), self.cols, self.rows)
+  self.igradNegPos = self.gradNegPos or E_negPos:clone()
+  self.igradRefPos = self.gradRefPos or E_refPos:clone()
+  self.igradRefNeg = self.gradRefNeg or E_refNeg:clone()
+  self.igradNegPos:zero()
+  self.igradRefPos:zero()
+  self.igradRefNeg:zero()
+  
+  local igradRefPos_vec = self.igradRefPos:view(dim*dim) 
+  local igradRegNeg_vec = self.igradRefNeg:view(dim*dim) 
+  local igradNegPos_vec = self.igradNegPos:view(dim*dim) 
+  local idx;
+  
+  idx = (self.cols) + (self.rows-1)*dim;
+  igradRefPos_vec:indexAdd(1, idx, ogradDprogE1)
+  igradRefPos_vec:indexAdd(1, idx, ogradDprogE2)
+  igradRefPos_vec:indexAdd(1, idx, ogradDprogE3)
+  igradRefPos_vec:indexAdd(1, idx, ogradDprogE4)
+  
+  -- mil fwd
+  idx = (self.maxInRefNegRowI) + (self.rows-1)*dim;
+  igradRegNeg_vec:indexAdd(1, idx, ogradMaxInRefNegRowE)
+  
   -- mil bwd
-  dprog.collect(self.distRefPos, dprogE_grad2:float(), self.cols, self.rows)
-  dprog.collect(self.distNegPos, maxInNegPosColE_grad:float(), self.cols, self.maxInNegPosColI)
+  idx = (self.cols) + (self.maxInNegPosColI-1)*dim;
+  igradNegPos_vec:indexAdd(1, idx, ogradMaxInNegPosColE)
+  
   -- contrast fwd
-   dprog.collect(self.distRefPos, dprogE_grad3:float(), self.cols, self.rows)
-   dprog.collect(self.distRefPos, max2InRowE_grad:float(), self.max2InRowI, self.rows)
-  -- contrast bwd  
-  dprog.collect(self.distRefPos, dprogE_grad4:float(), self.cols, self.rows)
-  dprog.collect(self.distRefPos, max2InColE_grad:float(), self.cols, self.max2InColI)
+  idx = (self.max2InRowI) + (self.rows-1)*dim;
+  igradRefPos_vec:indexAdd(1, idx, ogradMax2InRowE)
     
-  if input[1]:type() == "torch.CudaTensor" then 
-      self.gradInput = {self.distRefPos:cuda(), self.distRefNeg:cuda(), self.distNegPos:cuda()}
-  else
-      self.gradInput = {self.distRefPos:double(), self.distRefNeg:double(), self.distNegPos:double()}
-  end
+  -- contrast bwd  
+  idx = (self.cols) + (self.max2InColI-1)*dim;
+  igradRefPos_vec:indexAdd(1, idx, ogradMax2InColE)
+  
+  self.gradInput = {self.igradRefPos, self.igradRefNeg, self.igradNegPos}
    
   return self.gradInput
       

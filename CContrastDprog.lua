@@ -26,8 +26,6 @@ end
 function contrastDprog:updateOutput(input)
   
   local dim = input:size(1)
-
-  
   
   -- dprog (always on cpu)
   self.path = self.path or input:float()     
