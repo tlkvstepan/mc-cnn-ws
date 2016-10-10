@@ -6,9 +6,9 @@ require 'cunn'
 -- Custom modules
 dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to the input (I use it for masking purposes)
 
-require 'libdprog'                        -- C++ module for dynamic programming
+require 'libdprog'                        -- C++ module for dynamic programming              
+dofile('CMilDprog.lua');             -- Contrastive dynamic programming module
 dofile('CContrastDprog.lua');             -- Contrastive dynamic programming module
-dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
 
 dofile('DataLoader.lua');                 -- Parent class for dataloaders
 dofile('CUnsup3EpiSet.lua');              -- Unsupervised training set loader
@@ -21,6 +21,18 @@ testFun = dofile('CTestUtils.lua');         -- Function that performs test on va
 utils = dofile('utils.lua');              -- Utils for loading and visualization
 
 
+local loss_margin = 0.2
+local dist_min = 2
+local occ_th = 8   
+
+-- feature network parameters
+local net_nb_feature = 64
+local net_kernel = 3
+local net_nb_layers = 4
+
+math.randomseed(0); 
+torch.manualSeed(0)
+
 -- |read trainng data| (KITTI)
 local img1_arr = torch.squeeze(utils.fromfile('data/KITTI12/x0.bin'));
 local img2_arr = torch.squeeze(utils.fromfile('data/KITTI12/x1.bin'));
@@ -29,11 +41,8 @@ local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.
 local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
-math.randomseed(0); 
-torch.manualSeed(0)
-
-_BASE_FNET_, hpatch = baseNet.get(4, 64, 3)
-_TR_NET_, _CRITERION_ = netWrapper.getMilDprog(img_w, disp_max, hpatch, 2, 0.2, _BASE_FNET_)
+_BASE_FNET_, hpatch = baseNet.get(net_nb_layers, net_nb_feature, net_kernel)
+_TR_NET_, _CRITERION_ = netWrapper.getMilDprog(img_w, disp_max, hpatch, occ_th, loss_margin, _BASE_FNET_)
 _BASE_PPARAM_ = _BASE_FNET_:getParameters() 
 _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 
@@ -48,7 +57,8 @@ for i = 1,100 do
   input, target = unsupSet:index(torch.Tensor{i})
   input[1] = input[1]:cuda()
   input[2] = input[2]:cuda()
-  output = _TR_NET_:forward({input[1], input[2]})
+  input[3] = input[3]:cuda()
+  output = _TR_NET_:forward({input[1], input[2], input[3]})
   local   nb_tables = #_TR_NET_.output
 
   -- if nuber of nonempty output tables is 0, we can not do anything

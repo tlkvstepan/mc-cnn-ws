@@ -39,16 +39,16 @@ if not dbg then
   cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
 else
-  cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 128)      -- 342 one image in KITTI
-  cmd:option('-train_epoch_size', 128*10)  -- 342*389 all images in KITTI
+  cmd:option('-valid_set_size', 10)        -- 100 epi lines      
+  cmd:option('-train_batch_size', 32)      -- 342 one image in KITTI
+  cmd:option('-train_epoch_size', 32*10)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 10)         -- 35 times all images in KITTI
 end
 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
 cmd:option('-dist_min', 2)
-cmd:option('-occ_th', 1)   -- dont know optimal param yet
+cmd:option('-occ_th', 8)   -- 8
 
 -- feature network parameters
 cmd:option('-net_nb_feature', 64)
@@ -58,13 +58,25 @@ cmd:option('-net_nb_layers', 4)
 -- debug
 cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
-cmd:option('-debug_gpu_on', true)
-cmd:option('-debug_save_on', true)
+cmd:option('-debug_gpu_on', 1)
+cmd:option('-debug_save_on', 1)
 cmd:option('-debug_start_from_fnet', '')
 cmd:option('-debug_start_from_optim', '')
 
 prm = cmd:parse(arg)
 prm['arch'] = arch
+if prm['debug_gpu_on'] >= 1 then
+   prm['debug_gpu_on'] = true
+else
+   prm['debug_gpu_on'] = false
+end
+
+if prm['debug_save_on'] >= 1 then
+   prm['debug_save_on'] = true
+else
+   prm['debug_save_on'] = false 
+end
+
 
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
 

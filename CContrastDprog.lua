@@ -11,11 +11,10 @@
 
 local contrastDprog, parent = torch.class('nn.contrastDprog', 'nn.Module')
 
-function contrastDprog:__init(distMin, occTh, mask)
+function contrastDprog:__init(distMin, occTh)
    parent.__init(self)
    self.distMin = distMin
    self.occTh = occTh 
-   self.mask = mask
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
    self.cols = torch.Tensor()
    self.rows = torch.Tensor()
@@ -29,32 +28,32 @@ function contrastDprog:updateOutput(input)
   local dim = input:size(1)
 
   
-  self.pathNonOcc = self.pathNonOcc or input:clone() -- cuda if cuda mode
-  self.pathNonOcc:zero()
   
   -- dprog (always on cpu)
-  self.path = self.path or input:clone():float()     
+  self.path = self.path or input:float()     
   self.path:zero()
-  self.E = self.E or input:clone():float()
+  self.E = self.E or input:float()
   self.E:copy(input)
-  self.aE  = self.aE  or input:clone():float()    
-  self.aS = self.aS or input:clone():float()
-  self.traceBack  = self.traceBack  or input:clone():float()
+  self.aE  = self.aE  or input:float()    
+  self.aS = self.aS or input:float()
+  self.traceBack  = self.traceBack  or input:float()
   self.aE:zero()
   self.aS:zero()
   self.traceBack:zero()
   dprog.compute(self.E, self.path,  self.aE, self.aS, self.traceBack)
   
   -- mask occluded
+  self.pathNonOcc = self.pathNonOcc or input:clone() -- cuda if cuda mode
   self.pathNonOcc:copy(self.path)
+  
   local mask = torch.repeatTensor(self.pathNonOcc:sum(2):gt(self.occTh), 1, dim)
-  mask:add(torch.repeatTensor(self.pathNonOcc:sum(1):gt(self.occTh), dim, 1)):gt(0)
+  mask:add(torch.repeatTensor(self.pathNonOcc:sum(1):gt(self.occTh), dim, 1))
   self.pathNonOcc[mask] = 0;
   local dprogE = input[self.pathNonOcc:byte()]
   
   local E_masked = input -- cuda if cuda mode
   local E_masked_VEC = E_masked:view(dim*dim)
-  local indices = self.pathNonOcc:float():nonzero()
+  local indices = self.pathNonOcc:float():nonzero() -- cuda not supported for this opperation
   if( input:type() == "torch.CudaTensor"  )then
     indices = indices:cuda()
   end
@@ -64,6 +63,8 @@ function contrastDprog:updateOutput(input)
     
     self.rows = indices:select(2,1)
     self.cols = indices:select(2,2)
+    
+    -- mask energy array
     for dy = -self.distMin,self.distMin do
       local rowsMask = self.rows + dy;
       rowsMask[rowsMask:gt(dim)] = dim;
@@ -85,7 +86,6 @@ function contrastDprog:updateOutput(input)
     self.colwiseMaxE = self.colwiseMaxE:index(2,self.cols):squeeze()
     self.colwiseMaxI = self.colwiseMaxI:index(2,self.cols):squeeze()
     
-    -- if cuda is on than transfer all to cuda 
     self.output = {{dprogE, self.rowwiseMaxE}, {dprogE, self.colwiseMaxE}}
   
   else
