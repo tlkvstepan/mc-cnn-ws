@@ -39,16 +39,16 @@ if not dbg then
   cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
 else
-  cmd:option('-valid_set_size', 10)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 32)      -- 342 one image in KITTI
-  cmd:option('-train_epoch_size', 32*10)  -- 342*389 all images in KITTI
+  cmd:option('-valid_set_size', 100)        -- 100 epi lines      
+  cmd:option('-train_batch_size', 128)      -- 342 one image in KITTI
+  cmd:option('-train_epoch_size', 128*50)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 10)         -- 35 times all images in KITTI
 end
 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
-cmd:option('-dist_min', 2)
-cmd:option('-occ_th', 8)   -- 8
+cmd:option('-dist_min', 2) -- 2
+cmd:option('-occ_th', 1)   -- 1
 
 -- feature network parameters
 cmd:option('-net_nb_feature', 64)

@@ -14,7 +14,6 @@ cmd = torch.CmdLine()
 
 -- test parameters parameters
 cmd:option('-valid_set_size', 100) -- we use different data for test and validation       
-cmd:option('-test_set_size', 342*10)       
 cmd:option('-test_result_fname', 'test-contrast-max')
 cmd:option('-test_err_th', 3)
 
@@ -115,7 +114,7 @@ supSet:shuffle()  -- shuffle to have patches from all images
 -- test set follows validation set in shuffled set.. since we fix random seed position of all examples is same as during training
 test_set_start = (prm['valid_set_size']) + 1;
 test_set_end = (prm['test_set_size']) + (prm['valid_set_size']);
-_TE_INPUT_, _TE_TARGET_ = supSet:index(torch.range(test_set_start, test_set_end))
+_TE_INPUT_, _TE_TARGET_ = supSet:index({test_set_start, supSet:size()})
 
 -- put validation set on gpu if needed  
 _TE_TARGET_ = _TE_TARGET_:cuda()

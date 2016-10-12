@@ -1,4 +1,5 @@
 -- code fix
+0. use all test set for performance evaluation
 1. add Middlebury and KITTI15 datasets
 2. tune stereo pipeline with best of our nets (1000 random parameters samples)
 3. make equi-performance curve on our test set (for best of our nets and supervised)    
