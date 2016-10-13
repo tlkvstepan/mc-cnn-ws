@@ -1,3 +1,4 @@
+#SBATCH --cpus-per-task 1
 #!/bin/bash
 #SBATCH --workdir /home/tulyakov/research/mil-mc-cnn
 #SBATCH --nodes 1
