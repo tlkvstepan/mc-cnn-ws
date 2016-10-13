@@ -77,7 +77,6 @@ else
    prm['debug_save_on'] = false 
 end
 
-
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
 
 print('Semi-suprevised training with ' .. arch .. ' arhitecture \n')
@@ -318,7 +317,7 @@ if prm['debug_save_on'] then
   -- save net (we save all as double tensor)
   torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_:clone():double(), 'ascii');
 
-  -- save optim state (we save all as double tensor)
+  -- save optim state (we save all as double ten_TE_TARGET_sor)
   local optim_state_host ={}
   optim_state_host.t = _OPTIM_STATE_.t;
   optim_state_host.m = _OPTIM_STATE_.m:clone():double();
