@@ -16,6 +16,7 @@ cmd = torch.CmdLine()
 cmd:option('-valid_set_size', 100) -- we use different data for test and validation       
 cmd:option('-test_result_fname', 'test-contrast-max')
 cmd:option('-test_err_th', 3)
+cmd:option('-test_batch_size', 512)
 
 -- feature network parameters
 cmd:option('-net_fname', 'work/contrast-max/fnet_2016_09_29_12:57:49_contrast-max.t7')
@@ -113,18 +114,31 @@ supSet:shuffle()  -- shuffle to have patches from all images
 -- get test set
 -- test set follows validation set in shuffled set.. since we fix random seed position of all examples is same as during training
 test_set_start = (prm['valid_set_size']) + 1;
-test_set_end = (prm['test_set_size']) + (prm['valid_set_size']);
-_TE_INPUT_, _TE_TARGET_ = supSet:index({test_set_start, supSet:size()})
+supSet.id = supSet.id[{{test_set_start, supSet:size()}}];   
 
--- put validation set on gpu if needed  
-_TE_TARGET_ = _TE_TARGET_:cuda()
-_TE_INPUT_[1] = _TE_INPUT_[1]:cuda();
-_TE_INPUT_[2] = _TE_INPUT_[2]:cuda();
-
--- |test|
+-- get network for test
 local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
 distNet:cuda()
-local test_acc_lt3, errCases = testFun.getTestAcc(distNet, _TE_INPUT_, _TE_TARGET_, prm['test_err_th'])
+
+test_acc_lt3 = {}
+nbatch = 1;
+for k, input, target  in supSet:subiter(prm['test_batch_size'], supSet:size()) do
+  
+  -- put validation set on gpu if needed  
+  target = target:cuda()
+  input[1] = input[1]:cuda();
+  input[2] = input[2]:cuda();
+
+  -- |test|
+  test_acc_lt3[nbatch], errCases = testFun.getTestAcc(distNet, input, target, prm['test_err_th'])
+
+  nbatch = nbatch + 1;
+ 
+  --collectgarbage()
+end
+
+test_acc_lt3  = torch.Tensor(test_acc_lt3)
+test_acc_lt3 = test_acc_lt3:mean()
 
 -- |save test report|
 -- save test parameters
@@ -139,10 +153,11 @@ image.save('work/' .. prm['test_result_fname'] .. '/error_cases_' .. timestamp .
 local lines = {3, 9, 14, 53}
 for nline = 1,#lines do
     
+    input, target  = supSet:index(torch.Tensor({lines[nline]}))
     local distMat, gtDistMat = testFun.getDist(distNet, 
-                              {_TE_INPUT_[1][{{lines[nline]},{},{}}], 
-                               _TE_INPUT_[2][{{lines[nline]},{},{}}]}, 
-                               _TE_TARGET_[{{lines[nline]},{},{}}], prm['test_err_th'])
+                              {input[1]:cuda(), 
+                               input[2]:cuda()}, 
+                               target:cuda(), prm['test_err_th'])
 
     local gtDistMat = -utils.scale2_01(gtDistMat)+1
 

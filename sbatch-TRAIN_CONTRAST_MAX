@@ -4,16 +4,15 @@
 #SBATCH --ntasks 1
 #SBATCH --cpus-per-task 1
 #SBATCH --mem 16384
-#SBATCH --time 12:00:00
-#SBATCH --qos=gpu_free
+#SBATCH --time 24:00:00
+#SBATCH --qos gpu
 #SBATCH --gres gpu:1
 #SBATCH --partition=gpu
-echo TRAIN MIL_CONTRAST_MAX STARTING AT `date`
+echo TRAIN CONTRAST_MAX STARTING AT `date`
 source /etc/profile.d/slmodules.sh -r deprecated
 module purge
 module load cuda/7.0
 module load torch/7
 module load opencv/2.4.9/gcc-4.4.7
-th /home/tulyakov/research/mil-mc-cnn/TEST_NET.lua our -net_fname "work/mil-contrast-max/fnet_2016_10_03_08:21:21_mil-contrast-max.t7" -test_result_fname "test-mil-contrast-max"  
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua contrast-max -debug_fname 'contrast-max' 
 echo FINISHED at `date`
-

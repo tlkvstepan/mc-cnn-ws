@@ -100,7 +100,9 @@ end
 
 
 function testUtils.getTestAcc(distNet, input, target, errTh)
-
+  
+  
+  
   local nb_samples = input[1]:size(1);
   local refEpi, posEpi = unpack(input) 
   local hpatch = (refEpi:size(2)-1)/2
@@ -112,36 +114,40 @@ function testUtils.getTestAcc(distNet, input, target, errTh)
   local gt = {}
   local dispErr = {}
   local err = {}
-  
+     
   for nsample = 1, nb_samples do
 
     local gtDisp      = target[{{nsample}, {}}]:double():squeeze();
-    
+        
     local sample_input = {refEpi[{{nsample}, {}, {}}], posEpi[{{nsample}, {}, {}}]}
+    
     local distMat = distNet:forward(sample_input):double() 
     
-    local val, wtaDisp = torch.max(distMat, 2)
+    local val, wtaDisp = torch.max(distMat, 2)  
+    
     wtaDisp = wtaDisp:double()
+        
     wtaDisp = torch.add(row, -wtaDisp) -- here we compute real disparities 
     
     local dispDiff = torch.abs(wtaDisp-gtDisp)
-    dispErr[nsample] = dispDiff[gtDisp:ne(-1)];
+    dispErr[nsample] = dispDiff[gtDisp:ne(-1)]:double(); -- put on cpu
      
     -- save failure cases ( >= 3 px)
-    local failMask = gtDisp:ne(-1):clone()
-    failMask = failMask:cmul(dispDiff:ge(3)) 
-    local failIdx = row[failMask]:clone()
+    local failMask = gtDisp:ne(-1)
+    failMask = failMask:cmul(dispDiff:ge(errTh)) 
+    local failIdx = row[failMask]
 
-    if failMask:sum() > 0 then
+    if failMask:sum() > 0  then
              
       local refIdx = failIdx + hpatch
       local gtIdx  = failIdx - gtDisp[failMask] + hpatch 
       local solIdx = failIdx - wtaDisp[failMask] + hpatch 
              
-      ref[#ref+1] = testUtils.getPatch(refEpi[{{nsample}, {}, {}}], refIdx)
-      gt[#gt+1]  = testUtils.getPatch(posEpi[{{nsample}, {}, {}}], gtIdx)
-      sol[#sol+1] = testUtils.getPatch(posEpi[{{nsample}, {}, {}}], solIdx)
-      err[#err+1] = dispDiff[failMask]:clone()  
+      ref[#ref+1] = testUtils.getPatch(refEpi[{{nsample}, {}, {}}], refIdx:double())
+      gt[#gt+1]  = testUtils.getPatch(posEpi[{{nsample}, {}, {}}], gtIdx:double())
+      sol[#sol+1] = testUtils.getPatch(posEpi[{{nsample}, {}, {}}], solIdx:double())
+      err[#err+1] = dispDiff[failMask]:double()
+      
     end    
   end
   
