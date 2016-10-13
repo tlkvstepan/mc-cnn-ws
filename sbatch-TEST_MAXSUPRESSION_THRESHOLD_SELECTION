@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH --workdir /home/tulyakov/research/mil-mc-cnn
+#SBATCH --nodes 1
+#SBATCH --ntasks 1
+#SBATCH --cpus-per-task 1
+#SBATCH --mem 16384
+#SBATCH --time 12:00:00
+#SBATCH --qos=gpu_free
+#SBATCH --gres gpu:1
+#SBATCH --partition=gpu
+echo EXPERIMENT FOR SELECTING OPTIMAL MAX SUPRESSION THRESHOLD AT `date`
+source /etc/profile.d/slmodules.sh -r deprecated
+module purge
+module load cuda/7.0
+module load torch/7
+module load opencv/2.4.9/gcc-4.4.7
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua debug contrast-max -dist_min 0 -debug_fname 'contrast-max-0' 
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua debug contrast-max -dist_min 1 -debug_fname 'contrast-max-1'
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua debug contrast-max -dist_min 2 -debug_fname 'contrast-max-2'
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua debug contrast-max -dist_min 4 -debug_fname 'contrast-max-4'
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua debug contrast-max -dist_min 8 -debug_fname 'contrast-max-8'
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua debug contrast-max -dist_min 16 -debug_fname 'contrast-max-16'
+echo FINISHED at `date`
+
