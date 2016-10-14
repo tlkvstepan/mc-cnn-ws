@@ -13,6 +13,6 @@ source /etc/profile.d/slmodules.sh -r deprecated
 module purge
 module load cuda/7.0
 module load torch/7
-module load opencv/2.4.9/gcc-4.4.7
+module load opencv/3.0.0-rc1/gcc-4.4.7
 th /home/tulyakov/research/mil-mc-cnn/TEST_NET.lua our -net_fname "work/contrast-max/fnet_2016_09_29_12:57:49_contrast-max.t7" -test_result_fname "test-contrast-max"  
 echo FINISHED at `date`

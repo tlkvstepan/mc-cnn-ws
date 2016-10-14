@@ -13,6 +13,6 @@ source /etc/profile.d/slmodules.sh -r deprecated
 module purge
 module load cuda/7.0
 module load torch/7
-module load opencv/2.4.9/gcc-4.4.7
+module load opencv/3.0.0-rc1/gcc-4.4.7
 th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua mil-dprog -debug_fname "mil-dprog" -debug_start_from_fnet "work/mil-dprog/fnet_2016_10_14_09:29:06_mil-dprog.t7" -debug_start_from_optim "work/mil-dprog/optim_2016_10_14_09:29:06_mil-dprog.t7" 
 echo FINISHED at `date`
