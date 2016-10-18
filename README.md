@@ -5,13 +5,13 @@
 3. make equi-performance curve on our test set (for best of our nets and supervised)    
 
 -- experiments    
-1. train mil-contrast-max, contrast-dprog, mil-dprog and mil-contrast-dprog nets.
-2. perform optimal stopping for every net
-3. test all our nets and supervised net on our test set
-4. train our best performing net on Middlebury
-5. tune stereo pipeline with our best net for KITTI12 KITTI15 and Middlebury
-6. compare stereo performance on KITTI12, KITTI15 and Middlebury
-7. make equperformance curve for our best net and supervised net
+0. check training time for mc-cnn
+1. train contrast-dprog, mil-dprog and mil-contrast-dprog nets.
+2. test all our nets and supervised net on our test set
+3. train our best performing net on Middlebury
+4. tune stereo pipeline with our best net for KITTI12 KITTI15 and Middlebury
+5. compare stereo performance on KITTI12, KITTI15 and Middlebury
+6. make equperformance curve for our best net and supervised net
 
 -- minor code improvements
 1. save net together with optim state and train parameters (it will allow to simply restart learning). 

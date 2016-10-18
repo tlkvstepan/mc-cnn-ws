@@ -50,8 +50,9 @@ legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
 % contrast-dprog
 figure;
 title('contrast-dprog net')
-logContrastDprogFile = 'work/contrast-dprog/contrast-dprog-2016_10_12_22:53:01'
-logContrastDprog = dlmread(logContrastDprogFile, ' ', 1, 1)
+logContrastDprogFile1 = 'work/contrast-dprog/contrast-dprog-2016_10_12_22:53:01'
+logContrastDprogFile2 = 'work/contrast-dprog/contrast-dprog-2016_10_14_14:32:52'
+logContrastDprog = [dlmread(logContrastDprogFile1, ' ', 1, 1);dlmread(logContrastDprogFile2, ' ', 1, 1)]
 yyaxis left
 plot(logContrastDprog(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
@@ -67,7 +68,13 @@ figure;
 title('mil-dprog net')
 logFile1 = 'work/mil-dprog/mil-dprog-2016_10_12_22:57:46'
 logFile2 = 'work/mil-dprog/mil-dprog-2016_10_13_22:58:17'
-logInfo = [dlmread(logFile1, ' ', 1, 1);dlmread(logFile2, ' ', 1, 1)]
+logFile3 = 'work/mil-dprog/mil-dprog-2016_10_15_19:21:07'
+logFile4 = 'work/mil-dprog/mil-dprog-2016_10_16_12:17:58'
+logFile5 = 'work/mil-dprog/mil-dprog-2016_10_17_21:06:35'
+logFile6 = 'work/mil-dprog/mil-dprog-2016_10_18_09:54:57'
+logInfo = [dlmread(logFile1, ' ', 1, 1); dlmread(logFile2, ' ', 1, 1);
+           dlmread(logFile3, ' ', 1, 1); dlmread(logFile4, ' ', 1, 1);
+           dlmread(logFile5, ' ', 1, 1)]
 yyaxis left
 plot(logInfo(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
@@ -82,7 +89,9 @@ legend({'Train error', 'Test accuracy', 'Smoothed test accuracy' })
 figure;
 title('mil-contrast-dprog net')
 logFile1 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_13_10:58:04'
-logInfo = dlmread(logFile1, ' ', 1, 1);
+logFile2 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_14_12:50:15'
+logFile3 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_15_19:16:25'
+logInfo = [dlmread(logFile1, ' ', 1, 1);dlmread(logFile2, ' ', 1, 1);dlmread(logFile3, ' ', 1, 1)]
 yyaxis left
 plot(logInfo(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
