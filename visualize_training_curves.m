@@ -72,9 +72,10 @@ logFile3 = 'work/mil-dprog/mil-dprog-2016_10_15_19:21:07'
 logFile4 = 'work/mil-dprog/mil-dprog-2016_10_16_12:17:58'
 logFile5 = 'work/mil-dprog/mil-dprog-2016_10_17_21:06:35'
 logFile6 = 'work/mil-dprog/mil-dprog-2016_10_18_09:54:57'
+logFile6 = 'work/mil-dprog/mil-dprog-2016_10_18_09:54:57'
 logInfo = [dlmread(logFile1, ' ', 1, 1); dlmread(logFile2, ' ', 1, 1);
            dlmread(logFile3, ' ', 1, 1); dlmread(logFile4, ' ', 1, 1);
-           dlmread(logFile5, ' ', 1, 1)]
+           dlmread(logFile5, ' ', 1, 1); dlmread(logFile6, ' ', 1, 1)]
 yyaxis left
 plot(logInfo(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
@@ -91,7 +92,13 @@ title('mil-contrast-dprog net')
 logFile1 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_13_10:58:04'
 logFile2 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_14_12:50:15'
 logFile3 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_15_19:16:25'
-logInfo = [dlmread(logFile1, ' ', 1, 1);dlmread(logFile2, ' ', 1, 1);dlmread(logFile3, ' ', 1, 1)]
+logFile4 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_19_14:30:19'
+logFile5 = 'work/mil-contrast-dprog/mil-contrast-dprog-2016_10_20_11:49:47'
+logInfo = [dlmread(logFile1, ' ', 1, 1);
+           dlmread(logFile2, ' ', 1, 1);
+           dlmread(logFile3, ' ', 1, 1);
+           dlmread(logFile4, ' ', 1, 1);
+           dlmread(logFile5, ' ', 1, 1)]
 yyaxis left
 plot(logInfo(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')

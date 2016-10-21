@@ -8,6 +8,7 @@
 0. check training time for mc-cnn
 1. train contrast-dprog, mil-dprog and mil-contrast-dprog nets.
 2. test all our nets and supervised net on our test set
+3. train our best performing net on KITTI15
 3. train our best performing net on Middlebury
 4. tune stereo pipeline with our best net for KITTI12 KITTI15 and Middlebury
 5. compare stereo performance on KITTI12, KITTI15 and Middlebury

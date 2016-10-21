@@ -24,6 +24,6 @@ plot(logOcc4(:,2),'-v'); hold on
 plot(logOcc8(:,2),'-s'); hold on
 plot(logOcc16(:,2),'-d'); hold on
 
-ylabel('Test accuracy: % of pixels |d-d_{gt}|<3')
+ylabel('Validation accuracy')
 xlabel('epoch#')
 legend({'maxsup 0', 'maxsup 1', 'maxsup 2', 'maxsup 4', 'maxsup 8', 'maxsup 16'})
