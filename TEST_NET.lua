@@ -19,7 +19,7 @@ cmd = torch.CmdLine()
 cmd:option('-valid_set_size', 100) -- we use different data for test and validation       
 cmd:option('-test_result_fname', 'test-contrast-max')
 cmd:option('-test_err_th', 3)
-cmd:option('-test_batch_size', 10) -- 512
+cmd:option('-test_batch_size', 1024)
 
 -- feature network parameters
 cmd:option('-net_fname', 'work/contrast-dprog/fnet_2016_10_15_18:25:25_contrast-dprog.t7')
@@ -131,8 +131,7 @@ supSet:shuffle()  -- shuffle to have patches from all images
 -- get test set
 -- test set follows validation set in shuffled set.. since we fix random seed position of all examples is same as during training
 test_set_start = (prm['valid_set_size']) + 1;
---supSet.id = supSet.id[{{test_set_start, supSet:size()}}];   
-supSet.id = supSet.id[{{test_set_start, test_set_start + 100}}];   
+supSet.id = supSet.id[{{test_set_start, supSet:size()}}];   
 
 -- get network for test
 local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
