@@ -6,13 +6,13 @@
 
 -- experiments    
 0. check training time for mc-cnn
-1. train contrast-dprog, mil-dprog and mil-contrast-dprog nets.
-2. test all our nets and supervised net on our test set
-3. train our best performing net on KITTI15
-3. train our best performing net on Middlebury
+1. train our best performing net on KITTI15
+2. train our best performing net on Middlebury
+3. compare cross-performance KITTI12-KITTI15-MB
 4. tune stereo pipeline with our best net for KITTI12 KITTI15 and Middlebury
 5. compare stereo performance on KITTI12, KITTI15 and Middlebury
 6. make equperformance curve for our best net and supervised net
+7. make mil-max-contrast-dprog network
 
 -- minor code improvements
 1. save net together with optim state and train parameters (it will allow to simply restart learning). 

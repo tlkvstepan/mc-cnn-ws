@@ -98,6 +98,69 @@ function testUtils.getPatch(epi,x)
 end
 
 
+function testUtils.getGraph(distNet, input, target, errTh)
+  
+  
+  
+  local nb_samples = input[1]:size(1);
+  local refEpi, posEpi = unpack(input) 
+  local hpatch = (refEpi:size(2)-1)/2
+  local im_w = refEpi:size(3)
+  local row = torch.range(1, im_w - 2*hpatch);
+    
+  local ref = {}
+  local sol = {}
+  local gt = {}
+  local dispErr = {}
+  local err = {}
+  nb_disp = 100
+  
+  nGtDispCum = 0
+  for nsample = 1, nb_samples do
+
+    -- get gt disparities
+    local gtDisp      = target[{{nsample}, {}}]:double():squeeze();
+    local nGtDisp = torch.sum(gtDisp:ne(-1):double())
+    
+    -- compute positive similarity
+    local sample_input = {refEpi[{{nsample}, {}, {}}], posEpi[{{nsample}, {}, {}}]}
+    local distMat = distNet:forward(sample_input):double() 
+        
+    nTrueSol = {}
+    for nbest = 1, 100 do
+    
+      -- compute best disparity
+      local maxVal, maxInd = torch.max(distMat, 2)  
+      wtaDisp = maxInd:double()
+      wtaDisp = torch.add(row, -wtaDisp) -- here we compute real disparities 
+    
+      -- compute % of true disparities not covered by 1..n-th maximums
+      local dispDiff = torch.abs(wtaDisp-gtDisp)
+      local failMask = gtDisp:ne(-1)
+      failMask = failMask:cmul(dispDiff:lt(errTh))
+      nTrueSol[nbest] = torch.sum(failMask)
+      
+      -- mark gt disp already covered 
+      gtDisp[failMask] = -1
+      
+      -- mask 
+      distMat = distMat:scatter(2, maxInd, -1/0)
+     
+    end
+    
+    if( nsample == 1 ) then
+      nTrueSolCum = torch.Tensor(nTrueSol)
+      nGtDispCum = nGtDisp
+    else
+      nGtDispCum =  nGtDispCum + nGtDisp
+      nTrueSolCum:add(torch.Tensor(nTrueSol))
+    end
+  end
+  
+  --nTrueSolCum = torch.cumsum(nTrueSolCum)/nGtDispCum
+
+  return nTrueSolCum, nGtDispCum
+end
 
 function testUtils.getTestAcc(distNet, input, target, errTh)
   
@@ -154,9 +217,9 @@ function testUtils.getTestAcc(distNet, input, target, errTh)
   dispErr  = torch.cat(dispErr,1)
   
   errCases = {torch.cat(ref,1), torch.cat(sol,1), torch.cat(gt,1), torch.cat(err,1)}
-  acc = dispErr[dispErr:lt(errTh)]:numel() * 100 / dispErr:numel();
+  --acc = dispErr[dispErr:lt(errTh)]:numel() * 100 / dispErr:numel();
   
-  return acc, errCases  
+  return dispErr, errCases  
 end
 
 return testUtils

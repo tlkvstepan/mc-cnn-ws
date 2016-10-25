@@ -10,16 +10,19 @@ require 'torch'
 arch = table.remove(arg, 1) 
 assert(arch == 'our' or arch == 'mc-cnn')
 
+set = table.remove(arg, 1) 
+assert(set == 'kitti' or set == 'kitti15' or set == 'mb')
+
 cmd = torch.CmdLine()
 
 -- test parameters parameters
 cmd:option('-valid_set_size', 100) -- we use different data for test and validation       
 cmd:option('-test_result_fname', 'test-contrast-max')
 cmd:option('-test_err_th', 3)
-cmd:option('-test_batch_size', 512)
+cmd:option('-test_batch_size', 10) -- 512
 
 -- feature network parameters
-cmd:option('-net_fname', 'work/contrast-max/fnet_2016_09_29_12:57:49_contrast-max.t7')
+cmd:option('-net_fname', 'work/contrast-dprog/fnet_2016_10_15_18:25:25_contrast-dprog.t7')
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
@@ -48,7 +51,6 @@ dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
 dofile('CMilDprog.lua');
 dofile('CMilContrastDprog.lua')
 dofile('DataLoader.lua');                 -- Parent class for dataloaders
-dofile('CUnsup3EpiSet.lua');              -- Unsupervised training set loader
 dofile('CSup2EpiSet.lua');          -- Supervised validation set loader
 
 baseNet = dofile('CBaseNet.lua');         -- Function that makes base net
@@ -81,10 +83,25 @@ utils.printTable(prm)
 math.randomseed(0); 
 torch.manualSeed(0)
 
--- |read test data| (KITTI)
-local img1_arr = torch.squeeze(utils.fromfile('data/KITTI12/x0.bin'));
-local img2_arr = torch.squeeze(utils.fromfile('data/KITTI12/x1.bin'));
-local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.bin')));
+-- |read test data|
+if set == 'kitti' then
+  x0_fname = 'data/KITTI12/x0.bin'
+  x1_fname = 'data/KITTI12/x1.bin'
+  dispnoc_fname  = 'data/KITTI12/dispnoc.bin'
+  nb_tr = 194
+  nb_te = 195
+elseif set == 'kitti15' then
+  x0_fname = 'data/KITTI15/x0.bin'
+  x1_fname = 'data/KITTI15/x1.bin'
+  dispnoc_fname  = 'data/KITTI15/dispnoc.bin'
+  nb_tr = 200
+  nb_te = 200
+elseif set == 'mb' then
+end
+
+local img1_arr = torch.squeeze(utils.fromfile(x0_fname));
+local img2_arr = torch.squeeze(utils.fromfile(x1_fname));
+local disp_arr = torch.round(torch.squeeze(utils.fromfile(dispnoc_fname)));
 local disp_max = disp_arr:max()
 local img_w = img1_arr:size(3);
 
@@ -114,13 +131,14 @@ supSet:shuffle()  -- shuffle to have patches from all images
 -- get test set
 -- test set follows validation set in shuffled set.. since we fix random seed position of all examples is same as during training
 test_set_start = (prm['valid_set_size']) + 1;
-supSet.id = supSet.id[{{test_set_start, supSet:size()}}];   
+--supSet.id = supSet.id[{{test_set_start, supSet:size()}}];   
+supSet.id = supSet.id[{{test_set_start, test_set_start + 100}}];   
 
 -- get network for test
 local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
 distNet:cuda()
 
-test_acc_lt3 = {}
+err = {}
 nbatch = 1;
 for k, input, target  in supSet:subiter(prm['test_batch_size'], supSet:size()) do
   
@@ -130,15 +148,27 @@ for k, input, target  in supSet:subiter(prm['test_batch_size'], supSet:size()) d
   input[2] = input[2]:cuda();
 
   -- |test|
-  test_acc_lt3[nbatch], errCases = testFun.getTestAcc(distNet, input, target, prm['test_err_th'])
+  err[nbatch], errCases = testFun.getTestAcc(distNet, input, target, prm['test_err_th'])
+  gtByMax_, gtNum_  = testFun.getGraph(distNet, input, target, prm['test_err_th'])
+  
+  if( nbatch == 1 ) then
+    gtByMax = gtByMax_
+    gtNum  = gtNum_  
+  else
+    gtByMax = gtByMax_ + gtByMax
+    gtNum  = gtNum_  + gtNum 
+  end
 
   nbatch = nbatch + 1;
- 
-  --collectgarbage()
+
 end
 
-test_acc_lt3  = torch.Tensor(test_acc_lt3)
-test_acc_lt3 = test_acc_lt3:mean()
+errPlot = torch.cumsum(gtByMax) * 100 / gtNum;
+err = torch.cat(err,1)
+errLt3 = torch.sum(err:lt(3)) * 100 / err:numel()
+
+--test_acc_lt3  = torch.Tensor(test_acc_lt3)
+--test_acc_lt3 = test_acc_lt3:mean()
 
 -- |save test report|
 -- save test parameters
@@ -180,9 +210,16 @@ for nline = 1,#lines do
 -- save log
 logger = optim.Logger('work/' .. prm['test_result_fname'] .. '/'.. prm['test_result_fname'], true)
 logger:setNames{'Accuracy (<3 disparity err)'}
-logger:add{test_acc_lt3}
+logger:add{errLt3}
 
 
+-- save error plot
+local out = assert(io.open('work/' .. prm['test_result_fname'] .. '/'.. prm['test_result_fname'] .. '_plotErr', "w")) -- open a file for serialization
+for i=1,errPlot:size(1) do
+  out:write(errPlot[i])
+  out:write(", ")
+end
+out:close()
 
 
 

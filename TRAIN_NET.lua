@@ -15,18 +15,18 @@ It supports following networks:
 require 'torch'
 
 -- |read input parameters|
--- fist argument is training net architecture
+-- fist   - argument is debug mode
+-- second - training wrapper architecture
+-- third  - training set
 dbg = table.remove(arg, 1) 
 if dbg == 'debug' then
-  arch = table.remove(arg, 1) 
+  arch = table.remove(arg, 1)
   dbg = true
 else
   arch = dbg
   dbg = false
 end
-
---print(dbg)
---print(arch)
+set = table.remove(arg, 1)
 
 cmd = torch.CmdLine()
 
@@ -36,12 +36,12 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 if not dbg then
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
   cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
-  cmd:option('-train_epoch_size', 342*389)  -- 342*389 all images in KITTI
+  cmd:option('-train_nb_batch', 389)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 35)         -- 35 times all images in KITTI
 else
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 128)      -- 342 one image in KITTI
-  cmd:option('-train_epoch_size', 128*50)  -- 342*389 all images in KITTI
+  cmd:option('-train_batch_size', 128)     -- 342 one image in KITTI
+  cmd:option('-train_nb_batch', 1)          -- 50 all images in KITTI
   cmd:option('-train_nb_epoch', 10)         -- 35 times all images in KITTI
 end
 
@@ -51,15 +51,19 @@ cmd:option('-dist_min', 2) -- 2
 cmd:option('-occ_th', 1)   -- 1
 
 -- feature network parameters
+-- (we have different default networks for mb and kitti)
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
-cmd:option('-net_nb_layers', 4)
+if( set == 'mb' ) then
+  cmd:option('-net_nb_layers', 5)
+else
+  cmd:option('-net_nb_layers', 4)
+end
 
 -- debug
 cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test')
 cmd:option('-debug_gpu_on', 1)
-cmd:option('-debug_save_on', 1)
 cmd:option('-debug_start_from_fnet', '')
 cmd:option('-debug_start_from_optim', '')
 
@@ -71,15 +75,8 @@ else
    prm['debug_gpu_on'] = false
 end
 
-if prm['debug_save_on'] >= 1 then
-   prm['debug_save_on'] = true
-else
-   prm['debug_save_on'] = false 
-end
-
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
-
-print('Semi-suprevised training with ' .. arch .. ' arhitecture \n')
+print('Semi-suprevised training ' .. arch .. ' arhitecture and ' .. set .. ' set\n')
   
 -- |load modules|
 
@@ -97,6 +94,12 @@ dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
 dofile('CMilDprog.lua');
 dofile('CMilContrastDprog.lua')
 dofile('DataLoader.lua');                 -- Parent class for dataloaders
+
+-- unsupervised set difinition
+dofile('CUnsupSet.lua')     
+dofile('CUnsupMB.lua')    -- MB
+dofile('CUnsupKITTI.lua') -- KITTI
+
 dofile('CUnsup3EpiSet.lua');              -- Unsupervised training set loader
 dofile('CSup2EpiSet.lua');          -- Supervised validation set loader
 
@@ -116,15 +119,7 @@ end
 math.randomseed(0); 
 torch.manualSeed(0)
 
--- |read trainng data| (KITTI)
-local img1_arr = torch.squeeze(utils.fromfile('data/KITTI12/x0.bin'));
-local img2_arr = torch.squeeze(utils.fromfile('data/KITTI12/x1.bin'));
-local disp_arr = torch.round(torch.squeeze(utils.fromfile('data/KITTI12/dispnoc.bin')));
-
-local disp_max = disp_arr:max()
-local img_w = img1_arr:size(3);
-
--- |define test and training networks|
+-- |define feature network|
 -- If we choose to start from timestamp, when try to read pre-trained base feature net
 local fnet_fname = prm['debug_start_from_fnet'] 
 local optim_fname = prm['debug_start_from_optim'] 
@@ -139,26 +134,8 @@ else
   print('Start training from the begining\n')
 end
 
--- make training network (note that parameters are copied from base feature network)
-if arch == 'mil-max' then
-  _TR_NET_, _CRITERION_ =  netWrapper.getMilMax(img_w, disp_max, hpatch, prm['loss_margin'], _BASE_FNET_)
-elseif arch == 'mil-dprog' then
-   _TR_NET_, _CRITERION_ =  netWrapper.getMilDprog(img_w, disp_max, hpatch, prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
-elseif arch == 'contrast-max' then
-  _TR_NET_, _CRITERION_ = netWrapper.getContrastMax(img_w, disp_max, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)  
-elseif arch == 'contrast-dprog' then
-  _TR_NET_, _CRITERION_ = netWrapper.getContrastDprog(img_w, disp_max, hpatch, prm['dist_min'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
-elseif arch == 'mil-contrast-max' then
-  _TR_NET_, _CRITERION_ = netWrapper.getMilContrastMax(img_w, disp_max, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)
-elseif arch == 'mil-contrast-dprog' then
-  _TR_NET_, _CRITERION_ = netWrapper.getMilContrastDprog(img_w, disp_max, hpatch, prm['dist_min'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
-end
-
--- put training net, base net, criterion and state of optimizer on gpu if needed
+-- put base net and state of optimizer on gpu if needed
 if prm['debug_gpu_on'] then
-  _TR_NET_:cuda()
-  _BASE_FNET_:cuda()
-  _CRITERION_:cuda()
   if _OPTIM_STATE_.m then
     _OPTIM_STATE_.m = _OPTIM_STATE_.m:cuda()
     _OPTIM_STATE_.v = _OPTIM_STATE_.v:cuda()
@@ -168,24 +145,83 @@ end
 
 -- get training and base network parametesr
 _BASE_PPARAM_ = _BASE_FNET_:getParameters() 
-_TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters()
 
--- |define datasets|
--- we want to have same training and test set all the time 
--- therfor we need to sat randomseed here (rand is used in net initialization)
-local unsupSet = unsup3EpiSet(img1_arr, img2_arr, hpatch, disp_max);
-local supSet = sup2EpiSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
-supSet:shuffle()  -- shuffle to have patches from all images
+-- |read data and set up training and validation sets|
+if set == 'kitti' then
+  
+  local x0_fname = 'data/KITTI12/x0.bin'
+  local x1_fname = 'data/KITTI12/x1.bin'
+  local dispnoc_fname  = 'data/KITTI12/dispnoc.bin'
+  local nb_tr = 194
+  local img1_arr = torch.squeeze(utils.fromfile(x0_fname));
+  local img2_arr = torch.squeeze(utils.fromfile(x1_fname));
+  local disp_arr = torch.round(torch.squeeze(utils.fromfile(dispnoc_fname)));
+  local disp_max = disp_arr:max()
+  local img_w = img1_arr:size(3);
+  
+  unsupSet = unsupKITTI(img1_arr, img2_arr, hpatch, disp_max);
+  
+  supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
+  supSet:shuffle()  -- shuffle to have patches from all images
 
--- get validation set from supervised set
-_VA_INPUT_, _VA_TARGET_ = supSet:index(torch.range(1, prm['valid_set_size']))
+elseif set == 'kitti15' then
+  
+  local x0_fname = 'data/KITTI15/x0.bin'
+  local x1_fname = 'data/KITTI15/x1.bin'
+  local dispnoc_fname  = 'data/KITTI15/dispnoc.bin'
+  local nb_tr = 200
+  local img1_arr = torch.squeeze(utils.fromfile(x0_fname));
+  local img2_arr = torch.squeeze(utils.fromfile(x1_fname));
+  local disp_arr = torch.round(torch.squeeze(utils.fromfile(dispnoc_fname)));
+  local disp_max = disp_arr:max()
+  local img_w = img1_arr:size(3);
+  
+  unsupSet = unsupKITTI(img1_arr, img2_arr, hpatch, disp_max);
+  
+  supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
+  supSet:shuffle()  -- shuffle to have patches from all images
 
--- put validation set on gpu if needed  
-if prm['debug_gpu_on'] then
-  _VA_TARGET_ = _VA_TARGET_:cuda()
-  _VA_INPUT_[1] = _VA_INPUT_[1]:cuda();
-  _VA_INPUT_[2] = _VA_INPUT_[2]:cuda();
+elseif set == 'mb' then
+  
+  local metadata_fname = 'data/MB/meta.bin'
+  local metadata = utils.fromfile(metadata_fname)
+  local img_tab = {}
+  local disp_tab = {}
+  for n = 1,metadata:size(1) do
+    local img_light_tab = {}
+    light = 1
+    while true do
+      fname = ('data/MB/x_%d_%d.bin'):format(n, light)
+      if not paths.filep(fname) then
+        break
+      end
+      table.insert(img_light_tab, utils.fromfile(fname))
+      light = light + 1
+    end
+    table.insert(img_tab, img_light_tab)
+    fname = ('data/MB/dispnoc%d.bin'):format(n)
+    if paths.filep(fname) then
+      table.insert(disp_tab, utils.fromfile(fname))
+    end
+  end
+    
+  unsupSet = unsupMB(img_tab, metadata, hpatch)
+  
 end
+
+
+---- |define datasets|
+---- we want to have same training and test set all the time 
+
+---- get validation set from supervised set
+--_VA_INPUT_, _VA_TARGET_ = supSet:index(torch.range(1, prm['valid_set_size']))
+
+---- put validation set on gpu if needed  
+--if prm['debug_gpu_on'] then
+--  _VA_TARGET_ = _VA_TARGET_:cuda()
+--  _VA_INPUT_[1] = _VA_INPUT_[1]:cuda();
+--  _VA_INPUT_[2] = _VA_INPUT_[2]:cuda();
+--end
 
 -- |define optimization function|
 feval = function(x)
@@ -247,114 +283,133 @@ feval = function(x)
 end
 
 -- |save debug info|
-if prm['debug_save_on'] then
-  
-  -- save train parameters
-  local timestamp = os.date("%Y_%m_%d_%X_")
-  torch.save('work/' .. prm['debug_fname'] .. '/params_' .. timestamp .. prm['debug_fname'] .. '.t7', prm, 'ascii');
-  
-end
+local timestamp = os.date("%Y_%m_%d_%X_")
+torch.save('work/' .. prm['debug_fname'] .. '/params_' .. timestamp .. prm['debug_fname'] .. '.t7', prm, 'ascii');
     
 -- |define logger|
-if prm['debug_save_on'] then
-  logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
-  logger:setNames{'Training loss', 'Accuracy (<3 disparity err)'}
-  logger:style{'+-', '+-'}
-end    
+logger = optim.Logger('work/' .. prm['debug_fname'] .. '/'.. prm['debug_fname'], true)
+logger:setNames{'Training loss', 'Accuracy (<3 disparity err)'}
+logger:style{'+-', '+-'}
 
 -- |optimize network|   
 local start_time = os.time()
 
+-- go through epoches
 for nepoch = 1, prm['train_nb_epoch'] do
 
   nsample = 0;
   sample_err = {}
   local train_err = 0
-
-  for k, input  in unsupSet:sampleiter(prm['train_batch_size'], prm['train_epoch_size']) do
-
-   _TR_INPUT_ = {}
-   _TR_INPUT_[1] = input[1]
-   _TR_INPUT_[2] = input[2]
-   if arch == 'mil-contrast-max' or arch == 'mil-max' or arch == 'mil-dprog' or arch == 'mil-contrast-dprog' then
-    _TR_INPUT_[3] = input[3]
+  
+  -- go through batches
+  for nbatch = 1, prm['train_nb_batch'] do
+    
+   -- get epipolar lines
+   _TR_INPUT_, width, dispMax = unsupSet:get(prm['train_batch_size'])   
+   
+   -- some network need only two epopolar lines
+   if arch == 'contrast-max' or arch == 'contrast-dprog' then
+      _TR_INPUT_[3] = nil
    end
    
-   -- if gpu avaliable put batch on gpu
+   -- make training network (note that parameters are copied from base feature network)
+   if arch == 'mil-max' then
+     _TR_NET_, _CRITERION_ =  netWrapper.getMilMax(width, dispMax, hpatch, prm['loss_margin'], _BASE_FNET_)
+   elseif arch == 'mil-dprog' then
+      _TR_NET_, _CRITERION_ =  netWrapper.getMilDprog(width, dispMax, hpatch, prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
+   elseif arch == 'contrast-max' then
+     _TR_NET_, _CRITERION_ = netWrapper.getContrastMax(width, dispMax, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)  
+   elseif arch == 'contrast-dprog' then
+     _TR_NET_, _CRITERION_ = netWrapper.getContrastDprog(width, dispMax, hpatch, prm['dist_min'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
+   elseif arch == 'mil-contrast-max' then
+     _TR_NET_, _CRITERION_ = netWrapper.getMilContrastMax(width, dispMax, hpatch, prm['dist_min'], prm['loss_margin'], _BASE_FNET_)
+   elseif arch == 'mil-contrast-dprog' then
+     _TR_NET_, _CRITERION_ = netWrapper.getMilContrastDprog(width, dispMax, hpatch, prm['dist_min'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
+   end
+
+   -- put on gpu
    if prm['debug_gpu_on'] then
+     _TR_NET_:cuda()
+     _CRITERION_:cuda()
      for i = 1,#_TR_INPUT_ do
      _TR_INPUT_[i] = _TR_INPUT_[i]:cuda()
      end
    end
+   
+   -- get training network
+   _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters() 
     
+   -- optimize 
    optim.adam(feval, _TR_PPARAM_, {}, _OPTIM_STATE_)    
    table.insert(sample_err, _TR_ERR_)
+
+   -- save new parameteres 
+   _BASE_PPARAM_:copy(_TR_PPARAM_)
 
 end
 
 train_err = torch.Tensor(sample_err):mean();
+print(train_err)
 
--- validation
-_BASE_PPARAM_:copy(_TR_PPARAM_)
-local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
-if prm['debug_gpu_on'] then
-  distNet:cuda()
-end
-local test_acc_lt3, errCases = testFun.getTestAcc(distNet, _VA_INPUT_, _VA_TARGET_, prm['debug_err_th'])
+--local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
+--if prm['debug_gpu_on'] then
+--  distNet:cuda()
+--end
+--local test_acc_lt3, errCases = testFun.getTestAcc(distNet, _VA_INPUT_, _VA_TARGET_, prm['debug_err_th'])
 
-local end_time = os.time()
-local time_diff = os.difftime(end_time,start_time);
+--local end_time = os.time()
+--local time_diff = os.difftime(end_time,start_time);
 
--- save debug info
-if prm['debug_save_on'] then
+---- save debug info
+--if prm['debug_save_on'] then
   
-  local timestamp = os.date("%Y_%m_%d_%X_")
+--  local timestamp = os.date("%Y_%m_%d_%X_")
 
-  -- save errorneous test samples
-  local fail_img = utils.vis_errors(errCases[1], errCases[2], errCases[3], errCases[4])
-  image.save('work/' .. prm['debug_fname'] .. '/error_cases_' .. timestamp .. prm['debug_fname'] .. '.png',fail_img)
+--  -- save errorneous test samples
+--  local fail_img = utils.vis_errors(errCases[1], errCases[2], errCases[3], errCases[4])
+--  image.save('work/' .. prm['debug_fname'] .. '/error_cases_' .. timestamp .. prm['debug_fname'] .. '.png',fail_img)
 
-  -- save net (we save all as double tensor)
-  torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_:clone():double(), 'ascii');
+--  -- save net (we save all as double tensor)
+--  torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_:clone():double(), 'ascii');
 
-  -- save optim state (we save all as double ten_TE_TARGET_sor)
-  local optim_state_host ={}
-  optim_state_host.t = _OPTIM_STATE_.t;
-  optim_state_host.m = _OPTIM_STATE_.m:clone():double();
-  optim_state_host.v = _OPTIM_STATE_.v:clone():double();
-  optim_state_host.denom = _OPTIM_STATE_.denom:clone():double();
-  torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
+--  -- save optim state (we save all as double ten_TE_TARGET_sor)
+--  local optim_state_host ={}
+--  optim_state_host.t = _OPTIM_STATE_.t;
+--  optim_state_host.m = _OPTIM_STATE_.m:clone():double();
+--  optim_state_host.v = _OPTIM_STATE_.v:clone():double();
+--  optim_state_host.denom = _OPTIM_STATE_.denom:clone():double();
+--  torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
 
-  -- save log
-  logger:add{train_err, test_acc_lt3}
-  logger:plot()
+--  -- save log
+--  logger:add{train_err, test_acc_lt3}
+--  logger:plot()
 
-  -- save distance matrices
-  local lines = {3,9}
-  for nline = 1,2 do
+--  -- save distance matrices
+--  local lines = {3,9}
+--  for nline = 1,2 do
     
-    local distMat, gtDistMat = testFun.getDist(distNet, {_VA_INPUT_[1][{{lines[nline]},{},{}}], _VA_INPUT_[2][{{lines[nline]},{},{}}]}, _VA_TARGET_[{{lines[nline]},{},{}}], prm['debug_err_th'])
+--    local distMat, gtDistMat = testFun.getDist(distNet, {_VA_INPUT_[1][{{lines[nline]},{},{}}], _VA_INPUT_[2][{{lines[nline]},{},{}}]}, _VA_TARGET_[{{lines[nline]},{},{}}], prm['debug_err_th'])
 
-    local gtDistMat = -utils.scale2_01(gtDistMat)+1
+--    local gtDistMat = -utils.scale2_01(gtDistMat)+1
 
-    local distMat = utils.softmax(distMat:squeeze())
-    local distMat = -utils.scale2_01(distMat)+1
+--    local distMat = utils.softmax(distMat:squeeze())
+--    local distMat = -utils.scale2_01(distMat)+1
 
-    local r = distMat:clone()
-    local g = distMat:clone()
-    local b = distMat:clone()
+--    local r = distMat:clone()
+--    local g = distMat:clone()
+--    local b = distMat:clone()
 
-    r[gtDistMat:eq(0)] = 0 
-    g[gtDistMat:eq(0)] = 1
-    b[gtDistMat:eq(0)] = 0
+--    r[gtDistMat:eq(0)] = 0 
+--    g[gtDistMat:eq(0)] = 1
+--    b[gtDistMat:eq(0)] = 0
 
-    im = torch.cat({nn.utils.addSingletonDimension(r,1), nn.utils.addSingletonDimension(g,1), nn.utils.addSingletonDimension(b,1)}, 1)
+--    im = torch.cat({nn.utils.addSingletonDimension(r,1), nn.utils.addSingletonDimension(g,1), nn.utils.addSingletonDimension(b,1)}, 1)
    
-   image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',im)
-  end
-end
+--   image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',im)
+--  end
+--end
 
-print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc_lt3))
+--print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc_lt3))
 collectgarbage()
 
 end
