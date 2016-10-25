@@ -132,6 +132,7 @@ supSet:shuffle()  -- shuffle to have patches from all images
 -- test set follows validation set in shuffled set.. since we fix random seed position of all examples is same as during training
 test_set_start = (prm['valid_set_size']) + 1;
 supSet.id = supSet.id[{{test_set_start, supSet:size()}}];   
+--supSet.id = supSet.id[{{test_set_start, test_set_start+100}}];   
 
 -- get network for test
 local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
@@ -216,7 +217,9 @@ logger:add{errLt3}
 local out = assert(io.open('work/' .. prm['test_result_fname'] .. '/'.. prm['test_result_fname'] .. '_plotErr', "w")) -- open a file for serialization
 for i=1,errPlot:size(1) do
   out:write(errPlot[i])
-  out:write(", ")
+  if i ~= errPlot:size(1) then
+    out:write(", ")
+  end
 end
 out:close()
 
