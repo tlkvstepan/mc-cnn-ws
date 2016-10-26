@@ -36,12 +36,12 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 -- optimization parameters parameters
 if not dbg then
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 342)      -- 342 one image in KITTI
+  cmd:option('-train_batch_size', 360)      -- 342 one image in KITTI
   cmd:option('-train_nb_batch', 389)  -- 342*389 all images in KITTI
   cmd:option('-train_nb_epoch', 100)         -- 35 times all images in KITTI
 else
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 128)     -- 342 one image in KITTI
+  cmd:option('-train_batch_size', 360)     -- 342 one image in KITTI
   cmd:option('-train_nb_batch', 1)          -- 50 all images in KITTI
   cmd:option('-train_nb_epoch', 10)         -- 35 times all images in KITTI
 end
@@ -118,6 +118,7 @@ utils.printTable(prm)
 
 if( prm['debug_gpu_on'] ) then            
   require 'cunn'
+  require 'cudnn'
 end
 
 math.randomseed(0); 
@@ -334,6 +335,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
    -- put on gpu
    if prm['debug_gpu_on'] then
      _TR_NET_:cuda()
+     cudnn.convert(_TR_NET_, cudnn)
      _CRITERION_:cuda()
      for i = 1,#_TR_INPUT_ do
      _TR_INPUT_[i] = _TR_INPUT_[i]:cuda()
@@ -357,6 +359,7 @@ train_err = torch.Tensor(sample_err):mean();
 local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
 if prm['debug_gpu_on'] then
   distNet:cuda()
+  cudnn.convert(distNet, cudnn)
 end
 
 local dispErr, errCases = testFun.getTestAcc(distNet, _VA_INPUT_, _VA_TARGET_, prm['debug_err_th'])
