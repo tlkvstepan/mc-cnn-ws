@@ -7,7 +7,11 @@
   **init( )**  
     
     Initialize unsupervised set. Should be redifined.  
-    
+  
+  **subset( prc )**
+  
+    Command to use only prc*100 % of set.
+  
   **get( batchSize )** 
   
     Given _batchSize_ returns _batchInput_, _width_, _dispMax_ 
@@ -33,6 +37,9 @@
     
   end
 
+  function unsupSet:subset( prc )
+    
+  end
 
 
 
