@@ -24,6 +24,6 @@ plot(logOcc4(:,2),'-v'); hold on
 plot(logOcc8(:,2),'-s'); hold on
 plot(logOcc16(:,2),'-d'); hold on
 
-ylabel('Validation accuracy')
+ylabel('Error rate')
 xlabel('epoch#')
-legend({'maxsup 0', 'maxsup 1', 'maxsup 2', 'maxsup 4', 'maxsup 8', 'maxsup 16'})
+legend({'t_{sup}=0', 't_{sup}=1', 't_{sup}= 2', 't_{sup}=4', 't_{sup}=8', 't_{sup}=16'})
