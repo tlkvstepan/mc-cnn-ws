@@ -127,6 +127,7 @@ function testUtils.getGraph(distNet, input, target, errTh)
     local distMat = distNet:forward(sample_input):double() 
         
     nTrueSol = {}
+    
     for nbest = 1, 100 do
     
       -- compute best disparity
@@ -164,8 +165,7 @@ end
 
 function testUtils.getTestAcc(distNet, input, target, errTh)
   
-  
-  
+   
   local nb_samples = input[1]:size(1);
   local refEpi, posEpi = unpack(input) 
   local hpatch = (refEpi:size(2)-1)/2

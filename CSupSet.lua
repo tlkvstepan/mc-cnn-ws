@@ -1,39 +1,41 @@
 --[[
   
-  Given number of stereo images **CLASS** provides access to dataset that 
-  consists of two epipolar line and gt disparity:     
+  This is prototype for unsupervised training set 
   
-  _refEpi_ and _posEpi_ are nb_patch x (2*hpatch+1) x (disp_max + 2*hpatch + 1) tensors,
+  Methods:
+  
+  **init( )**  
     
-  _gtDisp_ is nb_patch x disp_max tensor with ground truth disparities (or inf if disparity is not known)
-   
-  Motivation: compute test results faster, visualize "true" match line 
+    Initialize supervised set. Should be redifined.  
+    
+  **sample( id )**
+    
+    Specifies what images are used for dataset. 
+  
+  **get( batchSize )** 
+  
+    Given _batchSize_ returns _batchInput_, _width_, _dispMax_ 
+    
+    _batchInput_ is table that consists of _posEpi_, _refEpi_, _negEpi_
+    _posEpi_, _negEpi_ are _batchSize_ x (2*hpatch+1) x width tensors,
+    _refEpi_ are _batchSize_ x (2*hpatch+1) x (width - max_disp) tensors. 
+    _posEpi_ is conjugate epipolar line for _refEpi_ epipolar line.
+    _negEpi_ is not conjugate epipolar line for _refEpi_.
+ 
+    _width_ epipolar line length
+    _dispMax_ maximum disparity
+    
 ]]--
 
-local sup2EpiSet = torch.class('sup2EpiSet', 'DataLoader')
+local supSet = torch.class('supSet')
 local image = require 'image'
 
-function sup2EpiSet:__init(img1_arr, img2_arr, disp_arr, hpatch)
-   
-  disp_arr = torch.round(disp_arr);
-  
-  self.img1_arr = img1_arr;
-  self.img2_arr = img2_arr;
-  self.disp_arr = disp_arr; 
-   
-  self.nb_pairs = img1_arr:size(1);
-  self.img_h = img1_arr:size(2);
-  self.img_w = img1_arr:size(3);
-  self.hpatch = hpatch; 
-  self.disp_max = disp_arr:max();
+function supSet:__init( )
     
-  -- get list of valid epipolar lines
-  self.id = self:get_valid_id();
-  
 end
 
 
-function sup2EpiSet:id_2_pair_row(id)
+function supSet:id_2_pair_row(id)
     
   -- given id(s) function returns pair(s)# and row(s)#
     
@@ -43,7 +45,7 @@ function sup2EpiSet:id_2_pair_row(id)
     
 end
 
-function sup2EpiSet:pair_row_2_id(pair, row)
+function supSet:pair_row_2_id(pair, row)
     
   -- given pair(s)# and row(s)# function returns id(s)
     
@@ -53,7 +55,7 @@ function sup2EpiSet:pair_row_2_id(pair, row)
 end
 
 
-function sup2EpiSet:get_gt(id, disp)
+function supSet:get_gt(id, disp)
 
   -- given id(s) returns true disparities
   
@@ -79,7 +81,7 @@ function sup2EpiSet:get_gt(id, disp)
   return gt
 end  
  
-function sup2EpiSet:get_epi(id, img)
+function supSet:get_epi(id, img)
     
     -- given id(s) returns epipolar stripes
   
@@ -97,7 +99,7 @@ function sup2EpiSet:get_epi(id, img)
   
 end
 
-function sup2EpiSet:get_valid_id()
+function supSet:get_valid_id()
   
   --[[ 
     
@@ -142,7 +144,7 @@ function sup2EpiSet:get_valid_id()
     return id
 end
 
-function sup2EpiSet:index(indices, inputs, targets)   
+function supSet:index(indices, inputs, targets)   
    
    --[[ 
     
@@ -172,7 +174,7 @@ function sup2EpiSet:index(indices, inputs, targets)
    return inputs, targets
 end
 
-function sup2EpiSet:sample(batchsize)
+function supSet:sample(batchsize)
    
    self._indices = self._indices or torch.LongTensor()
    self._indices:resize(batchsize):random(1,self:size())
@@ -180,7 +182,7 @@ function sup2EpiSet:sample(batchsize)
 
 end
 
-function sup2EpiSet:shuffle()
+function supSet:shuffle()
   
    local indices = torch.LongTensor():randperm(self:size())
    self.id = self.id:index(1,indices);
@@ -188,7 +190,7 @@ function sup2EpiSet:shuffle()
 
 end
 
-function sup2EpiSet:split(ratio)
+function supSet:split(ratio)
    
    assert(ratio > 0 and ratio < 1, "Expecting 0 < arg < 1")
    
@@ -206,7 +208,7 @@ function sup2EpiSet:split(ratio)
 
 end
 
-function sup2EpiSet:size()
+function supSet:size()
     return self.id:numel()
 end
 
