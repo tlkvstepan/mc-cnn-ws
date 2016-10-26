@@ -45,7 +45,8 @@ else
   cmd:option('-train_nb_batch', 1)          -- 50 all images in KITTI
   cmd:option('-train_nb_epoch', 10)         -- 35 times all images in KITTI
 end
-
+cmd:option('-train_set_prc', 0.1)        -- 100 epi lines      
+ 
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
 cmd:option('-maxsup_th', 2) -- 4
@@ -211,7 +212,7 @@ elseif set == 'mb' then
   unsupSet = unsupMB(img_tab, metadata, hpatch)
   
 end
-
+unsupSet:subset(prm['train_set_prc'])
 
 ---- |define datasets|
 ---- we want to have same training and test set all the time 

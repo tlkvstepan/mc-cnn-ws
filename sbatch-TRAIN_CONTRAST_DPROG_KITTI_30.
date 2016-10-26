@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --workdir /home/tulyakov/research/mil-mc-cnn
+#SBATCH --nodes 1
+#SBATCH --ntasks 1
+#SBATCH --cpus-per-task 1
+#SBATCH --mem 16384
+#SBATCH --time 12:00:00
+#SBATCH --qos=gpu
+#SBATCH --gres gpu:1
+#SBATCH --partition=gpu
+echo TRAIN CONTRAST_DPROG STARTING AT `date`
+source /etc/profile.d/slmodules.sh -r deprecated
+module purge
+module load cuda/7.0
+module load torch/7
+module load opencv/3.0.0-rc1/gcc-4.4.7
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua contrast-dprog kitti -train_set_prc 0.3 -debug_fname 'contrast-dprog-kitti' 
+echo FINISHED at `date`
