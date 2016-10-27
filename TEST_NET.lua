@@ -85,15 +85,15 @@ torch.manualSeed(0)
 
 -- |read test data|
 if set == 'kitti' then
-  x0_fname = 'data/KITTI12/x0.bin'
-  x1_fname = 'data/KITTI12/x1.bin'
-  dispnoc_fname  = 'data/KITTI12/dispnoc.bin'
+  x0_fname = 'data/kitti/x0.bin'
+  x1_fname = 'data/kitti/x1.bin'
+  dispnoc_fname  = 'data/kitti/dispnoc.bin'
   nb_tr = 194
   nb_te = 195
 elseif set == 'kitti15' then
-  x0_fname = 'data/KITTI15/x0.bin'
-  x1_fname = 'data/KITTI15/x1.bin'
-  dispnoc_fname  = 'data/KITTI15/dispnoc.bin'
+  x0_fname = 'data/kitti15/x0.bin'
+  x1_fname = 'data/kitti15/x1.bin'
+  dispnoc_fname  = 'data/kitti15/dispnoc.bin'
   nb_tr = 200
   nb_te = 200
 elseif set == 'mb' then
@@ -198,9 +198,9 @@ for nline = 1,#lines do
     local g = distMat:clone()
     local b = distMat:clone()
 
-    r[gtDistMat:eq(0)] = 0 
-    g[gtDistMat:eq(0)] = 1
-    b[gtDistMat:eq(0)] = 0
+   -- r[gtDistMat:eq(0)] = 0 
+   -- g[gtDistMat:eq(0)] = 1
+   -- b[gtDistMat:eq(0)] = 0
 
     im = torch.cat({nn.utils.addSingletonDimension(r,1), nn.utils.addSingletonDimension(g,1), nn.utils.addSingletonDimension(b,1)}, 1)
    

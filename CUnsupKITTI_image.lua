@@ -103,6 +103,10 @@
     local  width  = im0:size(3)
     local  height = im0:size(2)
     
-    return {im0, im1}, height, width, self.disp_max 
+    local im = torch.DoubleTensor(2, height, width)
+    im[1] = im0
+    im[2] = im1
+    
+    return im, height, width, self.disp_max 
        
   end
