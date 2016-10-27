@@ -1,9 +1,0 @@
-th TRAIN_NET.lua debug contrast-dprog -dist_min 0  -debug_fname contrast-dprog-0
-th TRAIN_NET.lua debug contrast-dprog -dist_min 2  -debug_fname contrast-dprog-1
-th TRAIN_NET.lua debug contrast-dprog -dist_min 4  -debug_fname contrast-dprog-2
-th TRAIN_NET.lua debug contrast-dprog -dist_min 8  -debug_fname contrast-dprog-4
-th TRAIN_NET.lua debug contrast-dprog -dist_min 16  -debug_fname contrast-dprog-8
-th TRAIN_NET.lua debug contrast-dprog -dist_min 16  -debug_fname contrast-dprog-8
-
-
-

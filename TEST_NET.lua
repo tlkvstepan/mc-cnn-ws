@@ -198,9 +198,9 @@ for nline = 1,#lines do
     local g = distMat:clone()
     local b = distMat:clone()
 
-    r[gtDistMat:eq(0)] = 0 
-    g[gtDistMat:eq(0)] = 1
-    b[gtDistMat:eq(0)] = 0
+   -- r[gtDistMat:eq(0)] = 0 
+   -- g[gtDistMat:eq(0)] = 1
+   -- b[gtDistMat:eq(0)] = 0
 
     im = torch.cat({nn.utils.addSingletonDimension(r,1), nn.utils.addSingletonDimension(g,1), nn.utils.addSingletonDimension(b,1)}, 1)
    
