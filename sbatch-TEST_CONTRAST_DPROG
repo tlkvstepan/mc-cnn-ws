@@ -14,5 +14,5 @@ module purge
 module load cuda/7.0
 module load torch/7
 module load opencv/3.0.0-rc1/gcc-4.4.7
-th /home/tulyakov/research/mil-mc-cnn/TEST_NET.lua our -net_fname "work/contrast-dprog/fnet_2016_10_15_18:25:25_contrast-dprog.t7" -test_result_fname "TEST-contrast-dprog"  
+th /home/tulyakov/research/mil-mc-cnn/TEST_NET.lua our kitti -net_fname "work/contrast-dprog/fnet_2016_10_15_18:25:25_contrast-dprog.t7" -test_result_fname "TEST-contrast-dprog"  
 echo FINISHED at `date`
