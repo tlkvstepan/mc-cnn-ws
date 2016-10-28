@@ -3,12 +3,18 @@
   function unsupKITTI_HD:__init(baseFolder, setName, hpatch)
     
     self.baseFolder = baseFolder;
-    self.nbFrames = 20
+    
+    if( setName == 'kitti15_ext' or setName == 'kitti15_ext' ) then
+      self.nbFrames = 20
+    else
+      self.nbFrames = 1
+    end
+    
     self.maxBatchSize = 370 - hpatch*2
     self.setName = setName 
     self.hpatch = hpatch
     
-    if setName == 'kitti' then
+    if setName == 'kitti' or setName == 'kitti_ext' then
         
         self.im0_fname = baseFolder .. '/%s/image_0/%06d_%02d.png' 
         self.im1_fname = baseFolder .. '/%s/image_1/%06d_%02d.png'
@@ -17,7 +23,7 @@
         self.train_nbIm = 194
         self.disp_max = 250      -- guessed from training data
                 
-    elseif setName == 'kitti15' then
+    elseif setName == 'kitti15' or setName == 'kitti15_ext' then
             
         self.im0_fname = baseFolder .. '/%s/image_2/%06d_%01d.png' 
         self.im1_fname = baseFolder .. '/%s/image_3/%06d_%01d.png'
@@ -78,6 +84,10 @@
       end
       
       -- images location
+      if self.setName == 'kitti15' or self.setName == 'kitti' then
+        nFrame = 10
+      end
+    
       im0_fname = self.im0_fname:format(set, nImg, nFrame)  
       im1_fname = self.im1_fname:format(set, nImg, nFrame)
       

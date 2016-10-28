@@ -42,7 +42,7 @@ if not dbg then
 else
   cmd:option('-valid_set_size', 100)       -- 100 epi lines      
   cmd:option('-train_batch_size', 128)     -- 129 one image in KITTI
-  cmd:option('-train_nb_batch', 100)       -- 50
+  cmd:option('-train_nb_batch', 50)       -- 50
   cmd:option('-train_nb_epoch', 10)        -- 10
 end
 cmd:option('-train_set_prc', 0.1)        -- 100 epi lines      
@@ -152,7 +152,7 @@ end
 _BASE_PPARAM_ = _BASE_FNET_:getParameters() 
 
 -- |read data and set up training and validation sets|
-if set == 'kitti' then
+if set == 'kitti_ext' or set == 'kitti'  then
   
   local x0_fname = 'data/kitti/x0.bin'
   local x1_fname = 'data/kitti/x1.bin'
@@ -164,12 +164,12 @@ if set == 'kitti' then
   disp_max = 250
   img_w = img1_arr:size(3);
   
-  unsupSet = unsupKITTI_HD('data/kitti_ext', 'kitti', hpatch);
+  unsupSet = unsupKITTI_HD('data/kitti_ext', set, hpatch);
   
   supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
   supSet:shuffle()  -- shuffle to have patches from all images
 
-elseif set == 'kitti15' then
+elseif set == 'kitti15' or set == 'kitti15_ext' then
   
   local x0_fname = 'data/kitti15/x0.bin'
   local x1_fname = 'data/kitti15/x1.bin'
