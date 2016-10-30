@@ -13,6 +13,7 @@
     self.maxBatchSize = 370 - hpatch*2
     self.setName = setName 
     self.hpatch = hpatch
+    --self.img_height = 350;
     
     if setName == 'kitti' or setName == 'kitti_ext' then
         
@@ -97,8 +98,12 @@
       -- read image
     local  im0 = image.load(im0_fname):double()
     local  im1 = image.load(im1_fname):double()
-      
-    
+        
+    img_height = 350    
+    local  width  = im0:size(3)
+    local  height = im0:size(2)
+    im0 = im0:narrow(2, height - img_height + 1, img_height)
+    im1 = im1:narrow(2, height - img_height  + 1, img_height)
     
     -- convert to luminance
     if self.setName == 'kitti15' then

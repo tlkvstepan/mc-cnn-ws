@@ -49,7 +49,7 @@ cmd:option('-train_set_prc', 0.1)        -- 100 epi lines
  
 -- training network parameters
 cmd:option('-loss_margin', 0.2)
-cmd:option('-maxsup_th', 4) -- 4
+cmd:option('-maxsup_th', 2) -- 2
 cmd:option('-occ_th', 1)    -- 1
 
 -- feature network parameters

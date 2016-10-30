@@ -172,6 +172,7 @@ function sup2EpiSet:index(indices, inputs, targets)
    return inputs, targets
 end
 
+
 function sup2EpiSet:sample(batchsize)
    
    self._indices = self._indices or torch.LongTensor()
