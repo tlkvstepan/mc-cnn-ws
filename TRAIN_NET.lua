@@ -161,10 +161,10 @@ if set == 'kitti_ext' or set == 'kitti'  then
   local img1_arr = torch.squeeze(utils.fromfile(x0_fname));
   local img2_arr = torch.squeeze(utils.fromfile(x1_fname));
   local disp_arr = torch.round(torch.squeeze(utils.fromfile(dispnoc_fname)));
-  disp_max = 250
+  disp_max = disp_arr:max()
   img_w = img1_arr:size(3);
   
-  unsupSet = unsupKITTI_HD('data/kitti_ext', set, hpatch);
+  unsupSet = unsupKITTI_HD('data/kitti/unzip', set, hpatch);
   
   supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
   supSet:shuffle()  -- shuffle to have patches from all images
@@ -178,10 +178,10 @@ elseif set == 'kitti15' or set == 'kitti15_ext' then
   local img1_arr = torch.squeeze(utils.fromfile(x0_fname));
   local img2_arr = torch.squeeze(utils.fromfile(x1_fname));
   local disp_arr = torch.round(torch.squeeze(utils.fromfile(dispnoc_fname)));
-  disp_max = 250
+  disp_max = disp_arr:max()
   img_w = img1_arr:size(3);
   
-  unsupSet = unsupKITTI_HD('data/kitti15_ext', 'kitti15', hpatch);
+  unsupSet = unsupKITTI_HD('data/kitti15/unzip', 'kitti15', hpatch);
   
   supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
   supSet:shuffle()  -- shuffle to have patches from all images
