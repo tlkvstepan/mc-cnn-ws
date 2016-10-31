@@ -254,7 +254,7 @@ feval = function(x)
     local nb_tables = #_TR_NET_.output
     
     -- if nuber of nonempty output tables is 0, we can not do anything
-    if nb_tables ~= 0 then
+    if nb_tables ~= 0  and _TR_NET_.output[1][1]:numel() > 1  then
     
       -- make target array for every table, and simultaneously compute 
       -- total number of samples
@@ -364,7 +364,7 @@ optim_state_host.denom = _OPTIM_STATE_.denom:clone():double();
 torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
 
 -- compute test error using MC-CNN
-local str = './main.lua mb our -a test_te -sm_terminate cnn -net_fname '  .. '"/HDD1/Data/MIL-MC-CNN/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7"'
+local str = './main.lua mb our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
 
 -- run for validation subset and get :error
 lfs.chdir('../mc-cnn')
@@ -372,8 +372,8 @@ local handle = io.popen(str)
 local result = handle:read("*a")
 local str_err = string.gsub(result,'\n','');
 local test_err = tonumber(str_cost);
---os.execute("cd ../mil-mc-cnn")
-      
+lfs.chdir('../mil-mc-cnn')
+
 -- save log
 logger:add{train_err, test_err}
 logger:plot()
