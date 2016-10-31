@@ -15,7 +15,7 @@
     self.hpatch = hpatch
     self.height = 370
     self.width = 1242;
-    self.nb_epi_per_image = 10; 
+    self.nb_epi_per_image = 1000; 
     
     if setName == 'kitti' or setName == 'kitti_ext' then
         
@@ -123,7 +123,7 @@
       actual_height = im0:size(2)
     
       -- convert to luminance
-      if self.setName == 'kitti15' then
+      if self.setName == 'kitti15' or self.setName == 'kitti15_ext'  then
         im0 = image.rgb2y(im0)
         im1 = image.rgb2y(im1)
       end

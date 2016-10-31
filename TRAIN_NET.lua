@@ -37,8 +37,8 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 if not dbg then
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
   cmd:option('-train_batch_size', 360)      -- 342 one image in KITTI
-  cmd:option('-train_nb_batch', 389)  -- 342*389 all images in KITTI
-  cmd:option('-train_nb_epoch', 100)         -- 35 times all images in KITTI
+  cmd:option('-train_nb_batch', 400)        -- 400 all images in KITTI
+  cmd:option('-train_nb_epoch', 100)        -- 35 times all images in KITTI
 else
   cmd:option('-valid_set_size', 100)       -- 100 epi lines      
   cmd:option('-train_batch_size', 128)     -- 129 one image in KITTI
