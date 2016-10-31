@@ -164,7 +164,7 @@ if set == 'kitti_ext' or set == 'kitti'  then
   disp_max = disp_arr:max()
   img_w = img1_arr:size(3);
   
-  unsupSet = unsupKITTI_HD('data/kitti/unzip', set, hpatch);
+  unsupSet = unsupKITTI_HD('data/kitti_ext', set, hpatch);
   
   supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
   supSet:shuffle()  -- shuffle to have patches from all images
@@ -181,7 +181,7 @@ elseif set == 'kitti15' or set == 'kitti15_ext' then
   disp_max = disp_arr:max()
   img_w = img1_arr:size(3);
   
-  unsupSet = unsupKITTI_HD('data/kitti15/unzip', 'kitti15', hpatch);
+  unsupSet = unsupKITTI_HD('data/kitti15_ext', set, hpatch);
   
   supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
   supSet:shuffle()  -- shuffle to have patches from all images
