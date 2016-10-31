@@ -123,7 +123,7 @@
       actual_height = im0:size(2)
     
       -- convert to luminance
-      if self.setName == 'kitti15' then
+      if self.setName == 'kitti15' or self.setName == 'kitti15_ext'  then
         im0 = image.rgb2y(im0)
         im1 = image.rgb2y(im1)
       end
