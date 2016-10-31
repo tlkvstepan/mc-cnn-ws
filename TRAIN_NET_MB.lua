@@ -36,13 +36,13 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 -- optimization parameters parameters
 if not dbg then
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 360)      -- 342 one image in KITTI
-  cmd:option('-train_nb_batch', 400)        -- 400 all images in KITTI
+  cmd:option('-train_batch_size', 500)      -- 342 one image in KITTI
+  cmd:option('-train_nb_batch', 90)        -- 400 all images in KITTI
   cmd:option('-train_nb_epoch', 100)        -- 35 times all images in KITTI
 else
   cmd:option('-valid_set_size', 100)       -- 100 epi lines      
   cmd:option('-train_batch_size', 128)     -- 129 one image in KITTI
-  cmd:option('-train_nb_batch', 50)       -- 50
+  cmd:option('-train_nb_batch', 1)       -- 50
   cmd:option('-train_nb_epoch', 10)        -- 10
 end
 cmd:option('-train_set_prc', 0.1)        -- 100 epi lines      
@@ -64,7 +64,7 @@ end
 
 -- debug
 cmd:option('-debug_err_th', 3)
-cmd:option('-debug_fname', 'test')
+cmd:option('-debug_fname', 'test-mb')
 cmd:option('-debug_gpu_on', 1)
 cmd:option('-debug_start_from_fnet', '')
 cmd:option('-debug_start_from_optim', '')
@@ -87,6 +87,7 @@ require 'gnuplot'
 require 'optim'
 require 'nn'
 require 'image'
+require 'lfs' -- change current lua directory
 
 -- Custom modules
 dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to the input (I use it for masking purposes)
@@ -112,6 +113,12 @@ netWrapper = dofile('CNetWrapper.lua')    -- Function that "wrap" base net into 
 testFun = dofile('CTestUtils.lua');         -- Function that performs test on validation set
 
 utils = dofile('utils.lua');              -- Utils for loading and visualization
+
+-- MC-CNN -----------------
+--package.cpath = package.cpath .. ';../mc-cnn/?.so'
+
+
+--------------------------
 
 print('Parameters of the procedure : \n')
 utils.printTable(prm)
@@ -164,7 +171,7 @@ if set == 'kitti_ext' or set == 'kitti'  then
   disp_max = disp_arr:max()
   img_w = img1_arr:size(3);
   
-  unsupSet = unsupKITTI_HD('data/kitti_ext', set, hpatch);
+  unsupSet = unsupKITTI_HD('data/kitti/unzip', set, hpatch);
   
   supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
   supSet:shuffle()  -- shuffle to have patches from all images
@@ -181,14 +188,14 @@ elseif set == 'kitti15' or set == 'kitti15_ext' then
   disp_max = disp_arr:max()
   img_w = img1_arr:size(3);
   
-  unsupSet = unsupKITTI_HD('data/kitti15_ext', set, hpatch);
+  unsupSet = unsupKITTI_HD('data/kitti15/unzip', 'kitti15', hpatch);
   
   supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
   supSet:shuffle()  -- shuffle to have patches from all images
 
 elseif set == 'mb' then
   
-  local metadata_fname = 'data/MB/meta.bin'
+  local metadata_fname = 'data/mb/meta.bin'
   local metadata = utils.fromfile(metadata_fname)
   local img_tab = {}
   local disp_tab = {}
@@ -196,7 +203,7 @@ elseif set == 'mb' then
     local img_light_tab = {}
     light = 1
     while true do
-      fname = ('data/MB/x_%d_%d.bin'):format(n, light)
+      fname = ('data/mb/x_%d_%d.bin'):format(n, light)
       if not paths.filep(fname) then
         break
       end
@@ -204,7 +211,7 @@ elseif set == 'mb' then
       light = light + 1
     end
     table.insert(img_tab, img_light_tab)
-    fname = ('data/MB/dispnoc%d.bin'):format(n)
+    fname = ('data/mb/dispnoc%d.bin'):format(n)
     if paths.filep(fname) then
       table.insert(disp_tab, utils.fromfile(fname))
     end
@@ -213,20 +220,8 @@ elseif set == 'mb' then
   unsupSet = unsupMB(img_tab, metadata, hpatch)
   
 end
-unsupSet:subset(prm['train_set_prc'])
 
----- |define datasets|
----- we want to have same training and test set all the time 
 
--- get validation set from supervised set
-_VA_INPUT_, _VA_TARGET_ = supSet:index(torch.range(1, prm['valid_set_size']))
-
--- put validation set on gpu if needed  
-if prm['debug_gpu_on'] then
-  _VA_TARGET_ = _VA_TARGET_:cuda()
-  _VA_INPUT_[1] = _VA_INPUT_[1]:cuda();
-  _VA_INPUT_[2] = _VA_INPUT_[2]:cuda();
-end
 
 -- |define optimization function|
 feval = function(x)
@@ -259,7 +254,7 @@ feval = function(x)
     local nb_tables = #_TR_NET_.output
     
     -- if nuber of nonempty output tables is 0, we can not do anything
-    if nb_tables ~= 0 and _TR_NET_.output[1][1]:numel() > 1 then
+    if nb_tables ~= 0 then
     
       -- make target array for every table, and simultaneously compute 
       -- total number of samples
@@ -356,67 +351,34 @@ end
 
 train_err = torch.Tensor(sample_err):mean();
 
-local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
-if prm['debug_gpu_on'] then
-  distNet:cuda()
-  cudnn.convert(distNet, cudnn)
-end
+-- save net (we save all as double tensor)
+local net_fname = 'work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7';
+torch.save(net_fname, _BASE_FNET_:clone():double(), 'ascii');
 
-local dispErr, errCases = testFun.getTestAcc(distNet, _VA_INPUT_, _VA_TARGET_, prm['debug_err_th'])
-test_acc_lt3 = dispErr[dispErr:lt(prm['debug_err_th'])]:numel() * 100 / dispErr:numel();
+-- save optim state (we save all as double ten_TE_TARGET_sor)
+local optim_state_host ={}
+optim_state_host.t = _OPTIM_STATE_.t;
+optim_state_host.m = _OPTIM_STATE_.m:clone():double();
+optim_state_host.v = _OPTIM_STATE_.v:clone():double();
+optim_state_host.denom = _OPTIM_STATE_.denom:clone():double();
+torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
 
+-- compute test error using MC-CNN
+local str = './main.lua mb our -a test_te -sm_terminate cnn -net_fname '  .. '"/HDD1/Data/MIL-MC-CNN/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7"'
 
-local end_time = os.time()
-local time_diff = os.difftime(end_time,start_time);
+-- run for validation subset and get :error
+lfs.chdir('../mc-cnn')
+local handle = io.popen(str)
+local result = handle:read("*a")
+local str_err = string.gsub(result,'\n','');
+local test_err = tonumber(str_cost);
+--os.execute("cd ../mil-mc-cnn")
+      
+-- save log
+logger:add{train_err, test_err}
+logger:plot()
 
--- save debug info
-
-  
-  local timestamp = os.date("%Y_%m_%d_%X_")
-
-  -- save errorneous test samples
-  local fail_img = utils.vis_errors(errCases[1], errCases[2], errCases[3], errCases[4])
-  image.save('work/' .. prm['debug_fname'] .. '/error_cases_' .. timestamp .. prm['debug_fname'] .. '.png',fail_img)
-
-  -- save net (we save all as double tensor)
-  torch.save('work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7', _BASE_FNET_:clone():double(), 'ascii');
-
-  -- save optim state (we save all as double ten_TE_TARGET_sor)
-  local optim_state_host ={}
-  optim_state_host.t = _OPTIM_STATE_.t;
-  optim_state_host.m = _OPTIM_STATE_.m:clone():double();
-  optim_state_host.v = _OPTIM_STATE_.v:clone():double();
-  optim_state_host.denom = _OPTIM_STATE_.denom:clone():double();
-  torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_fname'] .. '.t7', optim_state_host, 'ascii');
-
-  -- save log
-  logger:add{train_err, test_acc_lt3}
-  logger:plot()
-
-  -- save distance matrices
-  local lines = {3,9}
-  for nline = 1,2 do
-    
-    local distMat, gtDistMat = testFun.getDist(distNet, {_VA_INPUT_[1][{{lines[nline]},{},{}}], _VA_INPUT_[2][{{lines[nline]},{},{}}]}, _VA_TARGET_[{{lines[nline]},{},{}}], prm['debug_err_th'])
-
-    local gtDistMat = -utils.scale2_01(gtDistMat)+1
-
-    local distMat = utils.softmax(distMat:squeeze())
-    local distMat = -utils.scale2_01(distMat)+1
-
-    local r = distMat:clone()
-    local g = distMat:clone()
-    local b = distMat:clone()
-
-    r[gtDistMat:eq(0)] = 0 
-    g[gtDistMat:eq(0)] = 1
-    b[gtDistMat:eq(0)] = 0
-
-    im = torch.cat({nn.utils.addSingletonDimension(r,1), nn.utils.addSingletonDimension(g,1), nn.utils.addSingletonDimension(b,1)}, 1)
-   
-   image.save('work/' .. prm['debug_fname'] .. '/dist_' ..  string.format("line%i_",lines[nline])  .. timestamp .. prm['debug_fname'] .. '.png',im)
-  end
-
+-- print
 print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc_lt3))
 collectgarbage()
 
