@@ -41,7 +41,7 @@ if not dbg then
   cmd:option('-train_nb_epoch', 100)        -- 35 times all images in KITTI
 else
   cmd:option('-valid_set_size', 100)       -- 100 epi lines      
-  cmd:option('-train_batch_size', 128)     -- 129 one image in KITTI
+  cmd:option('-train_batch_size', 10)     -- 129 one image in KITTI
   cmd:option('-train_nb_batch', 1)       -- 50
   cmd:option('-train_nb_epoch', 10)        -- 10
 end
@@ -351,6 +351,9 @@ end
 
 train_err = torch.Tensor(sample_err):mean();
 
+local end_time = os.time()
+local time_diff = os.difftime(end_time,start_time);
+
 -- save net (we save all as double tensor)
 local net_fname = 'work/' .. prm['debug_fname'] .. '/fnet_' .. timestamp .. prm['debug_fname'] .. '.t7';
 torch.save(net_fname, _BASE_FNET_:clone():double(), 'ascii');
@@ -370,8 +373,8 @@ local str = './main.lua mb our -a test_te -sm_terminate cnn -net_fname ../mil-mc
 lfs.chdir('../mc-cnn')
 local handle = io.popen(str)
 local result = handle:read("*a")
-local str_err = string.gsub(result,'\n','');
-local test_err = tonumber(str_cost);
+str_err = string.gsub(result,'\n','');
+test_err = tonumber(str_err);
 lfs.chdir('../mil-mc-cnn')
 
 -- save log
@@ -379,7 +382,7 @@ logger:add{train_err, test_err}
 logger:plot()
 
 -- print
-print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_acc_lt3))
+print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_err))
 collectgarbage()
 
 end
