@@ -40,8 +40,8 @@ if not dbg then
   cmd:option('-train_nb_batch', 90)        -- 400 all images in KITTI
   cmd:option('-train_nb_epoch', 100)        -- 35 times all images in KITTI
 else
-  cmd:option('-valid_set_size', 342)       -- 100 epi lines      
-  cmd:option('-train_batch_size', 342)     -- 129 one image in KITTI
+  cmd:option('-valid_set_size', 100)       -- 100 epi lines      
+  cmd:option('-train_batch_size', 128)     -- 129 one image in KITTI
   cmd:option('-train_nb_batch', 1)       -- 50
   cmd:option('-train_nb_epoch', 10)        -- 10
 end
