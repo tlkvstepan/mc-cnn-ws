@@ -36,12 +36,12 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 -- optimization parameters parameters
 if not dbg then
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 500)      -- 342 one image in KITTI
+  cmd:option('-train_batch_size', 369)      -- 342 one image in KITTI
   cmd:option('-train_nb_batch', 90)        -- 400 all images in KITTI
   cmd:option('-train_nb_epoch', 100)        -- 35 times all images in KITTI
 else
-  cmd:option('-valid_set_size', 100)       -- 100 epi lines      
-  cmd:option('-train_batch_size', 10)     -- 129 one image in KITTI
+  cmd:option('-valid_set_size', 342)       -- 100 epi lines      
+  cmd:option('-train_batch_size', 342)     -- 129 one image in KITTI
   cmd:option('-train_nb_batch', 1)       -- 50
   cmd:option('-train_nb_epoch', 10)        -- 10
 end
@@ -215,6 +215,9 @@ elseif set == 'mb' then
     if paths.filep(fname) then
       table.insert(disp_tab, utils.fromfile(fname))
     end
+    if metadata[{n,3}] == -1 then -- fill max_disp for train set
+      metadata[{n,3}] = disp_tab[n]:max()
+    end
   end
     
   unsupSet = unsupMB(img_tab, metadata, hpatch)
@@ -307,6 +310,7 @@ for nepoch = 1, prm['train_nb_epoch'] do
    -- get epipolar lines
    _TR_INPUT_, width, dispMax = unsupSet:get(prm['train_batch_size'])   
    
+        
    -- some network need only two epopolar lines
    if arch == 'contrast-max' or arch == 'contrast-dprog' then
       _TR_INPUT_[3] = nil
@@ -346,7 +350,8 @@ for nepoch = 1, prm['train_nb_epoch'] do
 
    -- save new parameteres 
    _BASE_PPARAM_:copy(_TR_PPARAM_)
-
+  
+   collectgarbage()
 end
 
 train_err = torch.Tensor(sample_err):mean();
@@ -369,7 +374,7 @@ torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_
 -- compute test error using MC-CNN
 local str = './main.lua mb our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
 
--- run for validation subset and get :error
+---- run for validation subset and get :error
 lfs.chdir('../mc-cnn')
 local handle = io.popen(str)
 local result = handle:read("*a")
@@ -383,6 +388,8 @@ logger:plot()
 
 -- print
 print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_err))
+
+
 collectgarbage()
 
 end

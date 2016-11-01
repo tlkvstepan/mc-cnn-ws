@@ -17,12 +17,12 @@ cmd = torch.CmdLine()
 
 -- test parameters parameters
 cmd:option('-valid_set_size', 100) -- we use different data for test and validation       
-cmd:option('-test_result_fname', 'TEST')
+cmd:option('-test_result_fname', 'TEST-mil-max')
 cmd:option('-test_err_th', 3)
 cmd:option('-test_batch_size', 512)
 
 -- feature network parameters
-cmd:option('-net_fname', 'work/contrast-dprog/fnet_2016_10_15_18:25:25_contrast-dprog.t7')
+cmd:option('-net_fname', 'work/mil-max/fnet_2016_09_28_09:16:50_mil-max.t7')
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
 cmd:option('-net_nb_layers', 4)
@@ -126,46 +126,46 @@ end
 
 -- |define datasets|
 local supSet = sup2EpiSet(img1_arr[{{1,194},{},{}}], img2_arr[{{1,194},{},{}}], disp_arr[{{1,194},{},{}}], hpatch);
-supSet:shuffle()  -- shuffle to have patches from all images
+--supSet:shuffle()  -- shuffle to have patches from all images
 
 -- get test set
 -- test set follows validation set in shuffled set.. since we fix random seed position of all examples is same as during training
 test_set_start = (prm['valid_set_size']) + 1;
 --supSet.id = supSet.id[{{test_set_start, supSet:size()}}];   
-supSet.id = supSet.id[{{test_set_start, test_set_start+400}}];   
+supSet.id = supSet.id[{{1, test_set_start+300}}];   
 
 -- get network for test
 local distNet = netWrapper.getDistNet(img_w, disp_max, hpatch, _BASE_FNET_:clone():double())
 distNet:cuda()
 
-err = {}
-nbatch = 1;
-for k, input, target  in supSet:subiter(prm['test_batch_size'], supSet:size()) do
+--err = {}
+--nbatch = 1;
+--for k, input, target  in supSet:subiter(prm['test_batch_size'], supSet:size()) do
   
-  -- put validation set on gpu if needed  
-  target = target:cuda()
-  input[1] = input[1]:cuda();
-  input[2] = input[2]:cuda();
+--  -- put validation set on gpu if needed  
+--  target = target:cuda()
+--  input[1] = input[1]:cuda();
+--  input[2] = input[2]:cuda();
 
-  -- |test|
-  err[nbatch], errCases = testFun.getTestAcc(distNet, input, target, prm['test_err_th'])
-  gtByMax_, gtNum_  = testFun.getGraph(distNet, input, target, prm['test_err_th'])
+--  -- |test|
+--  err[nbatch], errCases = testFun.getTestAcc(distNet, input, target, prm['test_err_th'])
+--  gtByMax_, gtNum_  = testFun.getGraph(distNet, input, target, prm['test_err_th'])
   
-  if( nbatch == 1 ) then
-    gtByMax = gtByMax_
-    gtNum  = gtNum_  
-  else
-    gtByMax = gtByMax_ + gtByMax
-    gtNum  = gtNum_  + gtNum 
-  end
+--  if( nbatch == 1 ) then
+--    gtByMax = gtByMax_
+--    gtNum  = gtNum_  
+--  else
+--    gtByMax = gtByMax_ + gtByMax
+--    gtNum  = gtNum_  + gtNum 
+--  end
 
-  nbatch = nbatch + 1;
+--  nbatch = nbatch + 1;
 
-end
+--end
 
-errPlot = torch.cumsum(gtByMax) * 100 / gtNum;
-err = torch.cat(err,1)
-errLt3 = torch.sum(err:lt(3)) * 100 / err:numel()
+--errPlot = torch.cumsum(gtByMax) * 100 / gtNum;
+--err = torch.cat(err,1)
+--errLt3 = torch.sum(err:lt(3)) * 100 / err:numel()
 
 --test_acc_lt3  = torch.Tensor(test_acc_lt3)
 --test_acc_lt3 = test_acc_lt3:mean()
@@ -176,11 +176,12 @@ timestamp = os.date("%Y_%m_%d_%X_")
 torch.save('work/' .. prm['test_result_fname'] .. '/params_' .. timestamp .. prm['test_result_fname'] .. '.t7', prm, 'ascii');
 
 -- save errorneous test samples
-local fail_img = utils.vis_errors(errCases[1], errCases[2], errCases[3], errCases[4])
-image.save('work/' .. prm['test_result_fname'] .. '/error_cases_' .. timestamp .. prm['test_result_fname'] .. '.png',fail_img)
+--local fail_img = utils.vis_errors(errCases[1], errCases[2], errCases[3], errCases[4])
+--image.save('work/' .. prm['test_result_fname'] .. '/error_cases_' .. timestamp .. prm['test_result_fname'] .. '.png',fail_img)
 
 -- save distance matrices
-local lines = {3, 9, 14, 53}
+--local lines = {3, 9, 14, 53}
+local lines = {50, 200}
 for nline = 1,#lines do
     
     input, target  = supSet:index(torch.Tensor({lines[nline]}))
