@@ -14,5 +14,5 @@ module purge
 module load cuda/7.0
 module load torch/7
 module load opencv/3.0.0-rc1/gcc-4.4.7
-th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua contrast-dprog kitti15_ext -debug_fname 'contrast-dprog-kitti15-ext' -debug_start_from_fnet ''  -debug_start_from_optim ''
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua contrast-dprog kitti15_ext -debug_fname 'contrast-dprog-kitti15-ext' -debug_start_from_fnet 'work/contrast-dprog-kitti15-ext/fnet_2016_11_01_10:02:35_contrast-dprog-kitti15-ext.t7'  -debug_start_from_optim 'work/contrast-dprog-kitti15-ext/optim_2016_11_01_10:02:35_contrast-dprog-kitti15-ext.t7'
 echo FINISHED at `date`

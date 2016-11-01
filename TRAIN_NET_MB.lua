@@ -36,12 +36,12 @@ assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arc
 -- optimization parameters parameters
 if not dbg then
   cmd:option('-valid_set_size', 100)        -- 100 epi lines      
-  cmd:option('-train_batch_size', 500)      -- 342 one image in KITTI
-  cmd:option('-train_nb_batch', 90)        -- 400 all images in KITTI
-  cmd:option('-train_nb_epoch', 100)        -- 35 times all images in KITTI
+  cmd:option('-train_batch_size', 256)      -- 342 one image in KITTI
+  cmd:option('-train_nb_batch', 1)         -- all images in MB
+  cmd:option('-train_nb_epoch', 10000)        -- 35 times all images in KITTI
 else
   cmd:option('-valid_set_size', 100)       -- 100 epi lines      
-  cmd:option('-train_batch_size', 10)     -- 129 one image in KITTI
+  cmd:option('-train_batch_size', 128)     -- 129 one image in KITTI
   cmd:option('-train_nb_batch', 1)       -- 50
   cmd:option('-train_nb_epoch', 10)        -- 10
 end
