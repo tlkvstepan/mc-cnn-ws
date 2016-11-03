@@ -69,8 +69,7 @@
     local epiRef = torch.DoubleTensor(batch_size, 2*self.hpatch+1, self.width):zero() 
     local epiPos = torch.DoubleTensor(batch_size, 2*self.hpatch+1, self.width):zero()
     local epiNeg = torch.DoubleTensor(batch_size, 2*self.hpatch+1, self.width):zero() 
-    
-    
+        
 --    if self.maxBatchSize < batch_size then
 --      error('Maximum batch size is ' .. self.maxBatchSize .. '\n');
 --    end

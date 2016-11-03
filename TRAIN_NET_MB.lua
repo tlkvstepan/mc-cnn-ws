@@ -27,7 +27,6 @@ else
   arch = dbg
   dbg = false
 end
-set = table.remove(arg, 1)
 
 cmd = torch.CmdLine()
 
@@ -56,29 +55,18 @@ cmd:option('-occ_th', 1)    -- 1
 -- (we have different default networks for mb and kitti)
 cmd:option('-net_nb_feature', 64)
 cmd:option('-net_kernel', 3)
-if( set == 'mb' ) then
-  cmd:option('-net_nb_layers', 5)
-else
-  cmd:option('-net_nb_layers', 4)
-end
+cmd:option('-net_nb_layers', 5)
 
 -- debug
-cmd:option('-debug_err_th', 3)
 cmd:option('-debug_fname', 'test-mb')
-cmd:option('-debug_gpu_on', 1)
 cmd:option('-debug_start_from_fnet', '')
 cmd:option('-debug_start_from_optim', '')
 
 prm = cmd:parse(arg)
 prm['arch'] = arch
-if prm['debug_gpu_on'] >= 1 then
-   prm['debug_gpu_on'] = true
-else
-   prm['debug_gpu_on'] = false
-end
 
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
-print('Semi-suprevised training ' .. arch .. ' arhitecture and ' .. set .. ' set\n')
+print('Semi-suprevised training ' .. arch .. ' arhitecture and mb  set\n')
   
 -- |load modules|
 
@@ -114,19 +102,11 @@ testFun = dofile('CTestUtils.lua');         -- Function that performs test on va
 
 utils = dofile('utils.lua');              -- Utils for loading and visualization
 
--- MC-CNN -----------------
---package.cpath = package.cpath .. ';../mc-cnn/?.so'
-
-
---------------------------
-
 print('Parameters of the procedure : \n')
 utils.printTable(prm)
-
-if( prm['debug_gpu_on'] ) then            
-  require 'cunn'
-  require 'cudnn'
-end
+        
+require 'cunn'
+require 'cudnn'
 
 math.randomseed(0); 
 torch.manualSeed(0)
@@ -147,53 +127,17 @@ else
 end
 
 -- put base net and state of optimizer on gpu if needed
-if prm['debug_gpu_on'] then
-  if _OPTIM_STATE_.m then
+if _OPTIM_STATE_.m then
     _OPTIM_STATE_.m = _OPTIM_STATE_.m:cuda()
     _OPTIM_STATE_.v = _OPTIM_STATE_.v:cuda()
     _OPTIM_STATE_.denom = _OPTIM_STATE_.denom:cuda()
-  end
 end
 
 -- get training and base network parametesr
-_BASE_PPARAM_ = _BASE_FNET_:getParameters() 
+_BASE_PPARAM_, _BASE_PGRAD_ = _BASE_FNET_:getParameters() 
 
--- |read data and set up training and validation sets|
-if set == 'kitti_ext' or set == 'kitti'  then
-  
-  local x0_fname = 'data/kitti/x0.bin'
-  local x1_fname = 'data/kitti/x1.bin'
-  local dispnoc_fname  = 'data/kitti/dispnoc.bin'
-  local nb_tr = 194
-  local img1_arr = torch.squeeze(utils.fromfile(x0_fname));
-  local img2_arr = torch.squeeze(utils.fromfile(x1_fname));
-  local disp_arr = torch.round(torch.squeeze(utils.fromfile(dispnoc_fname)));
-  disp_max = disp_arr:max()
-  img_w = img1_arr:size(3);
-  
-  unsupSet = unsupKITTI_HD('data/kitti/unzip', set, hpatch);
-  
-  supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
-  supSet:shuffle()  -- shuffle to have patches from all images
-
-elseif set == 'kitti15' or set == 'kitti15_ext' then
-  
-  local x0_fname = 'data/kitti15/x0.bin'
-  local x1_fname = 'data/kitti15/x1.bin'
-  local dispnoc_fname  = 'data/kitti15/dispnoc.bin'
-  local nb_tr = 200
-  local img1_arr = torch.squeeze(utils.fromfile(x0_fname));
-  local img2_arr = torch.squeeze(utils.fromfile(x1_fname));
-  local disp_arr = torch.round(torch.squeeze(utils.fromfile(dispnoc_fname)));
-  disp_max = disp_arr:max()
-  img_w = img1_arr:size(3);
-  
-  unsupSet = unsupKITTI_HD('data/kitti15/unzip', 'kitti15', hpatch);
-  
-  supSet = sup2EpiSet(img1_arr[{{1,nb_tr},{},{}}], img2_arr[{{1,nb_tr},{},{}}], disp_arr[{{1,nb_tr},{},{}}], hpatch);
-  supSet:shuffle()  -- shuffle to have patches from all images
-
-elseif set == 'mb' then
+-- |read dataset|
+do
   
   local metadata_fname = 'data/mb/meta.bin'
   local metadata = utils.fromfile(metadata_fname)
@@ -221,68 +165,87 @@ elseif set == 'mb' then
   end
     
   unsupSet = unsupMB(img_tab, metadata, hpatch)
-  
+
 end
-
-
 
 -- |define optimization function|
 feval = function(x)
 
-  -- set net parameters
-  _TR_PPARAM_:copy(x)
-
-  -- clear gradients
-  _TR_PGRAD_:zero()
-
-  local batch_size = _TR_INPUT_[1]:size(1);
+  local batch_size = #_TR_INPUT_[1];
   local epiRef, epiPos, epiNeg = unpack(_TR_INPUT_) -- epiNeg does not exist for  contrast-max and contrast-dprog
-
+  
   _TR_ERR_ = 0;   
   
-  local nb_comp_ttl = 0;
-  for nsample = 1, batch_size do
-    
-    local sample_input = {}
-    sample_input[1] = epiRef[{{nsample},{},{}}]
-    sample_input[2] = epiPos[{{nsample},{},{}}]
-    if epiNeg ~= nil then
-      sample_input[3] = epiNeg[{{nsample},{},{}}]
-    end
+  -- clear gradients
+  _BASE_PGRAD_:zero()
   
+  local nb_comp_ttl = 0; 
+  local criterion, tr_net
+  
+  for nsample = 1, batch_size do
+  
+    local sample_input = {}
+    sample_input[1] = epiRef[nsample]
+    sample_input[2] = epiPos[nsample]
+    if epiNeg ~= nil then
+      sample_input[3] = epiNeg[nsample]
+    end
+    
+    if( _WIDTH_TAB_[nsample] ~= _WIDTH_TAB_[nsample-1] or _DISP_TAB_[nsample] ~= _DISP_TAB_[nsample-1] )  then
+    
+    -- make training network (note that parameters and gradients are copied from base network
+      tr_net, criterion =  netWrapper.getContrastDprog(_WIDTH_TAB_[nsample], _DISP_TAB_[nsample], hpatch, prm['maxsup_th'],  prm['occ_th'],  prm['loss_margin'], _BASE_FNET_)
+      
+      -- put network on cuda
+      tr_net:cuda()
+      criterion:cuda()
+      cudnn.convert(tr_net, cudnn)
+      
+      tr_param, tr_grad = tr_net:getParameters() 
+      
+    else
+      
+      tr_grad:zero()
+    
+    end
+    
     -- forward pass through net
-    _TR_NET_:forward(sample_input)
+    tr_net:forward(sample_input)
     
     -- find number of nonempty output tabels
-    local nb_tables = #_TR_NET_.output
+    local nb_tables = #tr_net.output
     
     -- if nuber of nonempty output tables is 0, we can not do anything
-    if nb_tables ~= 0  and _TR_NET_.output[1][1]:numel() > 1  then
-    
+    if nb_tables  and tr_net.output[1][1]:numel() > 1  then
+     
       -- make target array for every table, and simultaneously compute 
       -- total number of samples
       local sample_target = {};
       for ntable = 1,nb_tables do
-        local nb_comp = _TR_NET_.output[ntable][1]:numel()
+        local nb_comp = tr_net.output[ntable][1]:numel()
         nb_comp_ttl = nb_comp_ttl + nb_comp;
-        sample_target[ntable] = nn.utils.addSingletonDimension(_TR_NET_.output[ntable][1]:clone():fill(1),1) 
+        sample_target[ntable] = nn.utils.addSingletonDimension(tr_net.output[ntable][1]:clone():fill(1),1) 
+        sample_target[ntable] = sample_target[ntable]:cuda()
       end
       
       -- pass through criterion
-      _TR_ERR_ = _TR_ERR_ + _CRITERION_:forward(_TR_NET_.output, sample_target)
+      _TR_ERR_ = _TR_ERR_ + criterion:forward(tr_net.output, sample_target)
 
       -- backword pass
-      _TR_NET_:backward(sample_input, _CRITERION_:backward(_TR_NET_.output, sample_target))
+      tr_net:backward(sample_input, criterion:backward(tr_net.output, sample_target))
        collectgarbage()
      
-     end
-     
-  end
+    end
   
+    -- copy gradients to base net
+    _BASE_PGRAD_:add(tr_grad:double())
+    
+  end
+ 
   _TR_ERR_ = _TR_ERR_ / nb_comp_ttl
-  _TR_PGRAD_:div(nb_comp_ttl);
+  _BASE_PGRAD_:div(nb_comp_ttl);
 
-  return _TR_ERR_, _TR_PGRAD_      
+  return _TR_ERR_, _BASE_PGRAD_      
 end
 
 -- |save debug info|
@@ -307,52 +270,29 @@ for nepoch = 1, prm['train_nb_epoch'] do
   -- go through batches
   for nbatch = 1, prm['train_nb_batch'] do
     
-   -- get epipolar lines
-   _TR_INPUT_, width, dispMax = unsupSet:get(prm['train_batch_size'])   
-   
-        
+   -- get batch
+   _TR_INPUT_, _WIDTH_TAB_, _DISP_TAB_ = unsupSet:get(prm['train_batch_size'])   
+           
    -- some network need only two epopolar lines
    if arch == 'contrast-max' or arch == 'contrast-dprog' then
       _TR_INPUT_[3] = nil
    end
-   
-   -- make training network (note that parameters are copied from base feature network)
-   if arch == 'mil-max' then
-     _TR_NET_, _CRITERION_ =  netWrapper.getMilMax(width, dispMax, hpatch, prm['loss_margin'], _BASE_FNET_)
-   elseif arch == 'mil-dprog' then
-      _TR_NET_, _CRITERION_ =  netWrapper.getMilDprog(width, dispMax, hpatch, prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
-   elseif arch == 'contrast-max' then
-     _TR_NET_, _CRITERION_ = netWrapper.getContrastMax(width, dispMax, hpatch, prm['maxsup_th'], prm['loss_margin'], _BASE_FNET_)  
-   elseif arch == 'contrast-dprog' then
-     _TR_NET_, _CRITERION_ = netWrapper.getContrastDprog(width, dispMax, hpatch, prm['maxsup_th'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
-   elseif arch == 'mil-contrast-max' then
-     _TR_NET_, _CRITERION_ = netWrapper.getMilContrastMax(width, dispMax, hpatch, prm['maxsup_th'], prm['loss_margin'], _BASE_FNET_)
-   elseif arch == 'mil-contrast-dprog' then
-     _TR_NET_, _CRITERION_ = netWrapper.getMilContrastDprog(width, dispMax, hpatch, prm['maxsup_th'],  prm['occ_th'], prm['loss_margin'], _BASE_FNET_)
-   end
-
+      
    -- put on gpu
-   if prm['debug_gpu_on'] then
-     _TR_NET_:cuda()
-     cudnn.convert(_TR_NET_, cudnn)
-     _CRITERION_:cuda()
-     for i = 1,#_TR_INPUT_ do
-     _TR_INPUT_[i] = _TR_INPUT_[i]:cuda()
-     end
+   for nsample = 1, prm.train_batch_size do
+    for i = 1,#_TR_INPUT_ do
+      _TR_INPUT_[i][nsample] = _TR_INPUT_[i][nsample]:cuda()
+    end
    end
-   
-   -- get training network
-   _TR_PPARAM_, _TR_PGRAD_ = _TR_NET_:getParameters() 
-    
+       
    -- optimize 
-   optim.adam(feval, _TR_PPARAM_, {}, _OPTIM_STATE_)    
+   optim.adam(feval, _BASE_PPARAM_, {}, _OPTIM_STATE_)    
    table.insert(sample_err, _TR_ERR_)
-
-   -- save new parameteres 
-   _BASE_PPARAM_:copy(_TR_PPARAM_)
-  
+   
    collectgarbage()
-end
+   
+  end
+
 
 train_err = torch.Tensor(sample_err):mean();
 
@@ -388,7 +328,6 @@ logger:plot()
 
 -- print
 print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_err))
-
 
 collectgarbage()
 
