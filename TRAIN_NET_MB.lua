@@ -12,7 +12,11 @@ It supports following networks:
 
 ]]--
 
+--  -debug_start_from_fnet  work/contrast-dprog-mb/fnet_2016_11_02_19:05:06_contrast-dprog-mb.t7 -debug_start_from_optim work/contrast-dprog-mb/optim_2016_11_02_19:05:06_contrast-dprog-mb.t7
 
+
+
+---debug_start_from_fnet  work/test-mb-load/fnet_2016_11_04_14:40:02_test-mb-load.t7 -debug_start_from_optim work/test-mb-load/optim_2016_11_04_14:40:02_test-mb-load.t7
 require 'torch'
 
 -- |read input parameters|
@@ -134,6 +138,7 @@ if _OPTIM_STATE_.m then
 end
 
 -- get training and base network parametesr
+_BASE_FNET_:cuda()
 _BASE_PPARAM_, _BASE_PGRAD_ = _BASE_FNET_:getParameters() 
 
 -- |read dataset|
@@ -238,7 +243,7 @@ feval = function(x)
     end
   
     -- copy gradients to base net
-    _BASE_PGRAD_:add(tr_grad:double())
+    _BASE_PGRAD_:add(tr_grad)
     
   end
  
