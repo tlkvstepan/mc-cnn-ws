@@ -12,7 +12,11 @@ It supports following networks:
 
 ]]--
 
+--  -debug_start_from_fnet  work/contrast-dprog-mb/fnet_2016_11_02_19:05:06_contrast-dprog-mb.t7 -debug_start_from_optim work/contrast-dprog-mb/optim_2016_11_02_19:05:06_contrast-dprog-mb.t7
 
+
+
+---debug_start_from_fnet  work/test-mb-load/fnet_2016_11_04_14:40:02_test-mb-load.t7 -debug_start_from_optim work/test-mb-load/optim_2016_11_04_14:40:02_test-mb-load.t7
 require 'torch'
 
 -- |read input parameters|
@@ -21,16 +25,12 @@ require 'torch'
 -- third  - training set
 dbg = table.remove(arg, 1) 
 if dbg == 'debug' then
-  arch = table.remove(arg, 1)
   dbg = true
 else
-  arch = dbg
   dbg = false
 end
 
 cmd = torch.CmdLine()
-
-assert(arch == 'mil-max' or arch == 'mil-dprog' or arch == 'contrast-max' or arch == 'contrast-dprog' or arch == 'mil-contrast-max' or arch =='mil-contrast-dprog')
 
 -- optimization parameters parameters
 if not dbg then
@@ -63,10 +63,9 @@ cmd:option('-debug_start_from_fnet', '')
 cmd:option('-debug_start_from_optim', '')
 
 prm = cmd:parse(arg)
-prm['arch'] = arch
 
 paths.mkdir('work/'..prm['debug_fname']); -- make output folder
-print('Semi-suprevised training ' .. arch .. ' arhitecture and mb  set\n')
+print('Semi-suprevised training contrst-dp arhitecture and mb  set\n')
   
 -- |load modules|
 
@@ -134,6 +133,7 @@ if _OPTIM_STATE_.m then
 end
 
 -- get training and base network parametesr
+_BASE_FNET_:cuda()
 _BASE_PPARAM_, _BASE_PGRAD_ = _BASE_FNET_:getParameters() 
 
 -- |read dataset|
@@ -238,7 +238,7 @@ feval = function(x)
     end
   
     -- copy gradients to base net
-    _BASE_PGRAD_:add(tr_grad:double())
+    _BASE_PGRAD_:add(tr_grad)
     
   end
  

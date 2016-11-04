@@ -14,8 +14,11 @@ figure;
 file1 = 'work/contrast-dprog-kitti15-ext/contrast-dprog-kitti15-ext-2016_10_31_10:35:58'
 file2 = 'work/contrast-dprog-kitti15-ext/contrast-dprog-kitti15-ext-2016_11_01_12:13:42'
 file3 = 'work/contrast-dprog-kitti15-ext/contrast-dprog-kitti15-ext-2016_11_02_12:40:20'
-
-log = [dlmread(file1, ' ', 1, 1);dlmread(file2, ' ', 1, 1);dlmread(file3, ' ', 1, 1)]
+file4 = 'work/contrast-dprog-kitti15-ext/contrast-dprog-kitti15-ext-2016_11_03_13:25:51'
+file5 = 'work/contrast-dprog-kitti15-ext/contrast-dprog-kitti15-ext-2016_11_04_15:06:00'
+log = [ dlmread(file1, ' ', 1, 1);dlmread(file2, ' ', 1, 1);
+        dlmread(file3, ' ', 1, 1);dlmread(file4, ' ', 1, 1);
+        dlmread(file5, ' ', 1, 1)]
 yyaxis left
 plot(log(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
@@ -29,10 +32,12 @@ title('Large-scale contrast-dprog KITTI15')
 
 
 figure;
+
 file1 = 'work/contrast-dprog-kitti-ext/contrast-dprog-kitti-ext-2016_10_31_14:27:29'
 file2 = 'work/contrast-dprog-kitti-ext/contrast-dprog-kitti-ext-2016_11_01_14:44:13'
 file3 = 'work/contrast-dprog-kitti-ext/contrast-dprog-kitti-ext-2016_11_02_17:11:08'
-log = [dlmread(file1, ' ', 1, 1); dlmread(file2, ' ', 1, 1); dlmread(file3, ' ', 1, 1)]
+file4 = 'work/contrast-dprog-kitti-ext/contrast-dprog-kitti-ext-2016_11_03_21:52:00'
+log = [dlmread(file1, ' ', 1, 1); dlmread(file2, ' ', 1, 1); dlmread(file3, ' ', 1, 1); dlmread(file4, ' ', 1, 1)]
 yyaxis left
 plot(log(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
@@ -57,7 +62,11 @@ figure;
 file1 = 'work/contrast-dprog-kitti15/contrast-dprog-kitti15-2016_10_31_10:05:40'
 file2 = 'work/contrast-dprog-kitti15/contrast-dprog-kitti15-2016_11_01_10:25:54'
 file3 = 'work/contrast-dprog-kitti15/contrast-dprog-kitti15-2016_11_02_12:39:07'
-log = [dlmread(file1, ' ', 1, 1); dlmread(file2, ' ', 1, 1); dlmread(file3, ' ', 1, 1)]
+file4 = 'work/contrast-dprog-kitti15/contrast-dprog-kitti15-2016_11_03_13:24:23'
+file5 = 'work/contrast-dprog-kitti15/contrast-dprog-kitti15-2016_11_04_15:12:59'
+log = [dlmread(file1, ' ', 1, 1); dlmread(file2, ' ', 1, 1);
+       dlmread(file3, ' ', 1, 1); dlmread(file4, ' ', 1, 1);
+       dlmread(file5, ' ', 1, 1)]
 yyaxis left
 plot(log(:,1)); hold on
 ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
