@@ -15,7 +15,7 @@
     self.hpatch = hpatch
     self.height = 370
     self.width = 1242;
-    self.nb_epi_per_image = 40; 
+    self.nb_epi_per_image = 10; 
     
     if setName == 'kitti' or setName == 'kitti_ext' then
         
