@@ -216,7 +216,8 @@ feval = function(x)
     local nb_tables = #tr_net.output
     
     -- if nuber of nonempty output tables is 0, we can not do anything
-    if nb_tables  and tr_net.output[1][1]:numel() > 1  then
+    if nb_tables  > 0 then
+    if tr_net.output[1][1]:numel() > 1  then
      
       -- make target array for every table, and simultaneously compute 
       -- total number of samples
@@ -234,7 +235,8 @@ feval = function(x)
       -- backword pass
       tr_net:backward(sample_input, criterion:backward(tr_net.output, sample_target))
        collectgarbage()
-     
+    
+    end
     end
   
     -- copy gradients to base net
