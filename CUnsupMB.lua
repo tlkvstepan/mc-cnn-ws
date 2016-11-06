@@ -33,7 +33,7 @@
     self.hpatch = hpatch; 
     self.rowDiffMin = hpatch;
     
-    self.nb_epi_per_image = 10
+    self.nb_epi_per_image = 30
     
   end
 
