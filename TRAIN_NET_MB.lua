@@ -318,21 +318,20 @@ torch.save('work/' .. prm['debug_fname'] .. '/optim_'.. timestamp .. prm['debug_
 local str = './main.lua mb our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
 
 -- run for validation subset and get :error
---lfs.chdir('../mc-cnn')
---local handle = io.popen(str)
---local result = handle:read("*a")
---str_err = string.gsub(result,'\n','');
---test_err = tonumber(str_err);
---lfs.chdir('../mil-mc-cnn')
+lfs.chdir('../mc-cnn')
+local handle = io.popen(str)
+local result = handle:read("*a")
+str_err = string.gsub(result,'\n','');
+test_err = tonumber(str_err);
+lfs.chdir('../mil-mc-cnn')
 
----- save log
---logger:add{train_err, test_err}
---logger:plot()
+-- save log
+logger:add{train_err, test_err}
+logger:plot()
 
----- print
---print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_err))
-
-print(string.format("epoch %d, time = %f, train_err = %f", nepoch, time_diff, train_err))
+-- print
+print(string.format("epoch %d, time = %f, train_err = %f, test_acc = %f", nepoch, time_diff, train_err, test_err))
+--rint(string.format("epoch %d, time = %f, train_err = %f", nepoch, time_diff, train_err))
 
 collectgarbage()
 

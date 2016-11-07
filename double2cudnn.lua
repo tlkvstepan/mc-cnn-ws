@@ -12,6 +12,11 @@ parm_cudnn = mod_cudnn:getParameters()
 parm_double = mod:getParameters() 
 parm_double:copy(parm_cudnn)
 
+
+mod_clone = mod_cudnn:clone():double()
+parm_clone = mod_clone:getParameters() 
+
 print(parm_cudnn[4])
 print(parm_double[4])
+print(parm_clone[4])
 

@@ -1,62 +1,3 @@
-
---function stereo_predict(x_batch, id)
---   local vols, vol
-
---   if arch == 'ad' then
---      vols = torch.CudaTensor(2, disp_max, x_batch:size(3), x_batch:size(4)):fill(0 / 0)
---      adcensus.ad(x_batch[{{1}}], x_batch[{{2}}], vols[{{1}}], -1)
---      adcensus.ad(x_batch[{{2}}], x_batch[{{1}}], vols[{{2}}], 1)
---   end
-
--- --- DENSE SIFT
---   if arch == 'dsift' then
---      vols = torch.Tensor(2, disp_max, x_batch:size(3), x_batch:size(4)):float()
---      x_batch_host = x_batch:float();
---      cv.dsift(x_batch_host[{{1}}], x_batch_host[{{2}}], vols[{{1}}], vols[{{2}}])
---      vols = vols:cuda();
---   end
------
-
--- --- DAISY
---   if arch == 'daisy' then
---      vols = torch.Tensor(2, disp_max, x_batch:size(3), x_batch:size(4)):float()
---      x_batch_host = x_batch:float();
---      cv._daisy(x_batch_host[{{1}}], x_batch_host[{{2}}], vols[{{1}}], vols[{{2}}])
---      vols = vols:cuda();
---   end
------
-
----- TO-DO restore VGG support
-----[[
--- --- VGG
---   if arch == 'vgg' then
---      vols = torch.Tensor(2, disp_max, x_batch:size(3), x_batch:size(4)):float()
---      x_batch_host = x_batch:float();
---      --- TO-DO
---      all_filters = '/HDD1/Programs/opencv-dlco/workspace/filters.h5'
---      filter_weights = '/HDD1/Programs/opencv-dlco/workspace/pr-learn/liberty-0.035-0.250-pr.h5'
---      projection = '/HDD1/Programs/opencv-dlco/workspace/pj-learn/notredame-liberty-0.035-0.250-pr#7-0.0010-0.100-pj.h5'
---      cv.vgg(x_batch_host[{{1}}], x_batch_host[{{2}}], vols[{{1}}], vols[{{2}}], all_filters, filter_weights, projection)
---      vols = vols:cuda();
---   end
------
---]]--
-
---   if arch == 'census' then
---      vols = torch.CudaTensor(2, disp_max, x_batch:size(3), x_batch:size(4)):fill(0 / 0)
---      adcensus.census(x_batch[{{1}}], x_batch[{{2}}], vols[{{1}}], -1)
---      adcensus.census(x_batch[{{2}}], x_batch[{{1}}], vols[{{2}}], 1)
---   end
-
---   if arch == 'our'  then
---      forward_free(net_te, x_batch:clone())
---      vols = torch.CudaTensor(2, disp_max, x_batch:size(3), x_batch:size(4)):fill(0 / 0)
---      adcensus.StereoJoin(net_te.output[{{1}}], net_te.output[{{2}}], vols[{{1}}], vols[{{2}}])
---      fix_border(net_te, vols[{{1}}], -1)
---      fix_border(net_te, vols[{{2}}], 1)
---      clean_net(net_te)
---   end
-
 require 'nn'
 require 'cudnn'
 require 'cunn'
@@ -102,26 +43,52 @@ cmd:addTime('DYNCNN','%F %T')
 opt = cmd:parse(arg)
 
 ------------------
-function fix_border(hpatch, vol, direction)
-  for i=1,hpatch do
-    vol[{{},{},{},direction * i}]:copy(vol[{{},{},{},direction * (hpatch + 1)}])
-  end
+
+function gaussian(sigma)
+   local kr = math.ceil(sigma * 3)
+   local ks = kr * 2 + 1
+   local k = torch.Tensor(ks, ks)
+   for i = 1, ks do
+      for j = 1, ks do
+         local y = (i - 1) - kr
+         local x = (j - 1) - kr
+         k[{i,j}] = math.exp(-(x * x + y * y) / (2 * sigma * sigma))
+      end
+   end
+   return k
 end
 
+function get_window_size(net)
+   ws = 1
+   for i = 1,#net.modules do
+      local module = net:get(i)
+      if torch.typename(module) == 'cudnn.SpatialConvolution' or torch.typename(module) == 'nn.SpatialConvolution' then
+         ws = ws + module.kW - 1
+      end
+   end
+   return ws
+end
+
+function fix_border(net, vol, direction)
+   local n = (get_window_size(net) - 1) / 2
+   for i=1,n do
+      vol[{{},{},{},direction * i}]:copy(vol[{{},{},{},direction * (n + 1)}])
+   end
+end
 
 function forward_free(net, input)
-   local currentOutput = input
-   for i=1,#net.modules do
-      net.modules[i].oDesc = nil
-      local nextOutput = net.modules[i]:updateOutput(currentOutput)
-      if currentOutput:storage() ~= nextOutput:storage() then
-         currentOutput:storage():resize(1)
-         currentOutput:resize(0)
-      end
-      currentOutput = nextOutput
-   end
-   net.output = currentOutput
-   return currentOutput
+  local currentOutput = input
+  for i=1,#net.modules do
+    net.modules[i].oDesc = nil
+    local nextOutput = net.modules[i]:updateOutput(currentOutput)
+    if currentOutput:storage() ~= nextOutput:storage() then
+      currentOutput:storage():resize(1)
+      currentOutput:resize(0)
+    end
+    currentOutput = nextOutput
+  end
+  net.output = currentOutput
+  return currentOutput
 end
 
 
@@ -134,39 +101,40 @@ unsupSet = unsupKITTI_image('data/kitti_ext', 'kitti', hpatch);
 
 -- load feature net
 baseNet = dofile('CBaseNet.lua');        
-fnet, hpatch = baseNet.get(4, 64, 3, true)
-params = fnet:getParameters() 
-fnet_ = torch.load('work/contrast-dprog/fnet_2016_10_15_18:25:25_contrast-dprog.t7', 'ascii')
-params_ = fnet_:getParameters() 
-params:copy(params_)
+net_te = torch.load('work/contrast-dprog/fnet_2016_10_15_18:25:25_contrast-dprog.t7', 'ascii')
+for i = 1,#net_te.modules do
+  if torch.typename(net_te.modules[i]) == 'nn.SpatialConvolution' then
+    net_te.modules[i].padW = 1
+    net_te.modules[i].padH = 1
+  end
+end
+
+-- our net does not have normalization layer, add it
+net_te:add(nn.Normalize2())
+-- our net is not on cuda, put it on cuda
+net_te:cuda()
+cudnn.convert(net_te, cudnn)      
 
 -- get input
 input, height, width, disp_max = unsupSet:get(1)
-height = 60
-
--- size
-input = image.crop(input, 0, 200, width, 260)
 input = nn.utils.addSingletonDimension(input,2)
+disp_max = 70
 
 -- cudify
 input = input:cuda()
-fnet:cuda()
-cudnn.convert(fnet,cudnn)
 
 -- features
-forward_free(fnet, input:clone())
-
--- compute cost
+forward_free(net_te, input:clone())
 vols = torch.CudaTensor(2, disp_max, input:size(3), input:size(4)):fill(0 / 0)
-adcensus.StereoJoin(fnet.output[{{1}}], fnet.output[{{2}}], vols[{{1}}], vols[{{2}}])
-collectgarbage()
+adcensus.StereoJoin(net_te.output[{{1}}], net_te.output[{{2}}], vols[{{1}}], vols[{{2}}])
+fix_border(net_te, vols[{{1}}], -1)
+fix_border(net_te, vols[{{2}}], 1)
 
 disp = {}
 for _, direction in ipairs({1, -1}) do
 
   i = (direction == -1) and 1 or 2
-  fix_border(hpatch, vols[{{i}}], direction)
-
+  
   vol = vols[{{i}}]:transpose(2, 3):transpose(3, 4):clone()
   collectgarbage()
 
@@ -181,12 +149,21 @@ for _, direction in ipairs({1, -1}) do
   end
   collectgarbage()
 
-  
+
   _, d = torch.min(vol, 2)
   disp[i] = d:add(-1)
-  
+
 end  
 
+local outlier = torch.CudaTensor():resizeAs(disp[2]):zero()
+adcensus.outlier_detection(disp[2], disp[1], outlier, disp_max)
+disp[2] = adcensus.interpolate_occlusion(disp[2], outlier)
+disp[2] = adcensus.interpolate_mismatch(disp[2], outlier)
+disp[2] = adcensus.subpixel_enchancement(disp[2], vol, disp_max)
+disp[2] = adcensus.median2d(disp[2], 5)
+disp[2] = adcensus.mean2d(disp[2], gaussian(opt.blur_sigma):cuda(), opt.blur_t)
+
+x = 2
 --   local mb_directions = opt.a == 'predict' and {1, -1} or {-1}
 --   for _, direction in ipairs(dataset == 'mb' and mb_directions or {1, -1}) do
 --      sm_active = true
