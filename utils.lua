@@ -78,7 +78,8 @@ function utils.vis_errors(p1, p2, p3, text)
   local w = p1:size(3)
   local nb_patch = p1:size(1)
   
-  local max_nb_patch = 30
+  local border = 1
+  local max_nb_patch = 50
    
   -- reshuffle all errorneous patches
   local idx = torch.LongTensor():randperm(nb_patch)
@@ -86,7 +87,7 @@ function utils.vis_errors(p1, p2, p3, text)
     nb_patch = max_nb_patch
   end
   
-  local im = torch.Tensor(3,(h+3)*nb_patch, 3*(w+3)+2*w);
+  local im = torch.Tensor(3, 3*(w+border)+border, (h+border)*nb_patch);
   idx = idx[{{1,nb_patch}}];
   
   for nsample = 1,nb_patch do
@@ -104,13 +105,14 @@ function utils.vis_errors(p1, p2, p3, text)
       patch3:add(-patch3:min())
       patch3:div(patch3:max()-patch3:min())
       
-      num_txt = image.drawText(torch.ones(3,h,2*w),cur_txt, 2, 2, {color={0,0,0},size = 1})
-      local line = torch.cat({num_txt[{{1},{},{}}], patch1, torch.ones(1,h,3),
-                   patch2, torch.ones(1,h,3), patch3,torch.ones(1,h,3)}, 3)
+     -- num_txt = image.drawText(cur_txt, 2, 2, {color={0,0,0},size = 1})
+      local line = torch.cat({torch.zeros(1,border,w), patch1, torch.zeros(1,border,w),
+                   patch2, torch.zeros(1,border,w), patch3,torch.zeros(1,border,w)}, 2)
+      line = torch.cat({torch.zeros(1,3*(h+border)+border,border), line}, 3)
       line = torch.repeatTensor(line,3,1,1)
       
       
-      im[{{},{(nsample-1)*(h+3)+1,(nsample)*(h+3)},{}}] = torch.cat({line, torch.ones(3,3,2*w+3*(w+3))},2);          
+      im[{{},{},{(nsample-1)*(w+border)+1,(nsample)*(w+border)}}] = line;          
       
   end
     

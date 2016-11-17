@@ -118,7 +118,7 @@ cudnn.convert(net_te, cudnn)
 -- get input
 input, height, width, disp_max = unsupSet:get(1)
 input = nn.utils.addSingletonDimension(input,2)
-disp_max = 70
+disp_max = 100
 
 -- cudify
 input = input:cuda()
@@ -149,7 +149,6 @@ for _, direction in ipairs({1, -1}) do
   end
   collectgarbage()
 
-
   _, d = torch.min(vol, 2)
   disp[i] = d:add(-1)
 
@@ -162,8 +161,28 @@ disp[2] = adcensus.interpolate_mismatch(disp[2], outlier)
 disp[2] = adcensus.subpixel_enchancement(disp[2], vol, disp_max)
 disp[2] = adcensus.median2d(disp[2], 5)
 disp[2] = adcensus.mean2d(disp[2], gaussian(opt.blur_sigma):cuda(), opt.blur_t)
+outlier = nil
+disp[1] = nil
+ 
+ 
+--- mask maximum and all neighbours of the max
+do 
+  disp[2]:add(1) -- torch indexing
+  vol = vols[{{2}}]:clone():squeeze()
+  maxSup = 2;
+  for dist = -maxSup, maxSup do
+    local ind =  disp[2] + dist
+    ind = ind:squeeze():round()         -- we are interested in indices
+    ind = nn.utils.addSingletonDimension(ind,1)
+    ind[ind:lt(1)] = 1
+    ind[ind:gt(disp_max)] = disp_max
+    vol = vol:scatter(1, ind, -1/0)
+  end
+  actualCost, dispActual = torch.min(vol, 1)
+end 
+collectgarbage()
 
-x = 2
+
 --   local mb_directions = opt.a == 'predict' and {1, -1} or {-1}
 --   for _, direction in ipairs(dataset == 'mb' and mb_directions or {1, -1}) do
 --      sm_active = true
