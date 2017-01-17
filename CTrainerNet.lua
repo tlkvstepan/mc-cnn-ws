@@ -479,6 +479,7 @@ local trainerNet = {}
 
 function trainerNet.getContrastiveDP(img_w, disp_max, hpatch, dist_min, occ_th, loss_margin, metricNet)  
 
+
 local Net = metricNet:clone()
 --local Net = nn.Sequential()
 
@@ -497,7 +498,6 @@ Net:add(nn.Clamp(-1,1))
 -- convert range to (0 1)
 Net:add(nn.AddConstant(1))
 Net:add(nn.MulConstant(0.5))
-
 
 Net:add(nn.contrastDprog(dist_min, occ_th))
 

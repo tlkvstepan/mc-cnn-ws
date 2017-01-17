@@ -2,8 +2,6 @@
 
 This is universal script for semi-supervised training of network 
 
-
-
 It supports following networks:
 
 mil
@@ -18,11 +16,15 @@ kitti_ext
 kitti2015
 kitti2015_ext
 
+Typicall command line parameters
+debug contrastive-dp acrt-kitti kitti
+
 ]]--
 
 
 -- --
 ------------------------ read modules
+
 
 -- standard modules
 require 'gnuplot'
@@ -35,7 +37,9 @@ require 'lfs'
 -- cuda 
 require 'cunn'
 require 'cudnn'
-
+cudnn.benchmark = true
+cudnn.fastest = true
+   
 -- custom
 dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to the input (I use it for masking purposes)
 require 'libdprog'                        -- C++ module for dynamic programming
@@ -45,6 +49,8 @@ dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
 --dofile('CMilContrastDprog.lua')
 --dofile('DataLoader.lua');                 -- Parent class for dataloaders
 --dofile('CUnsupSet.lua')     
+dofile('copyElements.lua')
+dofile('fixedIndex.lua')
 dofile('CUnsupMB.lua')                     -- MB
 dofile('CUnsupKITTI.lua')
 --dofile('CSup2EpiSet.lua');                 -- Supervised validation set loader
@@ -53,16 +59,18 @@ trainerNet = dofile('CTrainerNet.lua')    -- Function that "wrap" base net into 
 testFun = dofile('CTestUtils.lua');         -- Function that performs test on validation set
 utils = dofile('utils.lua');              -- Utils for loading and visualization
 
+
+
 ----------------------------- parse input parameters
 dbg = table.remove(arg, 1) 
 method = table.remove(arg, 1)
-metric = table.remove(arg, 1)
+arch = table.remove(arg, 1)
 set = table.remove(arg, 1)
 
 cmd = torch.CmdLine()
 
 assert(method == 'mil' or method == 'contrastive' or method == 'contrastive-dp')
-assert(metric == 'mc-cnn-fst-mb' or metric == 'mc-cnn-fst-kitti')
+assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
 if dbg == 'normal' then
@@ -72,12 +80,12 @@ if dbg == 'normal' then
   cmd:option('-train_nb_epoch', 1000)        
 elseif dbg == 'tune' then
   cmd:option('-train_batch_size', 370)     
-  cmd:option('-train_nb_batch', 50)        
-  cmd:option('-train_nb_epoch', 4)        
+  cmd:option('-train_nb_batch', 100)        
+  cmd:option('-train_nb_epoch', 5)        
 else 
   cmd:option('-train_batch_size', 370)     
-  cmd:option('-train_nb_batch', 1)        
-  cmd:option('-train_nb_epoch', 7)        
+  cmd:option('-train_nb_batch', 10)        
+  cmd:option('-train_nb_epoch', 5)        
 end
 
 -- semi-supervised method parameters
@@ -86,7 +94,7 @@ cmd:option('-th_sup', 2)
 cmd:option('-th_occ', 1)    
 
 -- dbg
-cmd:option('-debug_fname', 'test')
+cmd:option('-debug_fname', 'equival-check')
 cmd:option('-debug_start_from_net', '')
 
 opt = cmd:parse(arg)
@@ -95,15 +103,25 @@ paths.mkdir('work/'..opt['debug_fname']); -- make output folder
 -- log
 local timestampBeg = os.date("%Y_%m_%d_%X")
 cmd:log('work/' .. opt['debug_fname'] .. '/log_' .. opt['debug_fname'] .. '_' .. timestampBeg .. '.txt', opt, 'ascii')
-print('Semi-suprevised training. Method: ' .. method .. ', metric: ' .. metric.. ', set: ' .. set.. ', mode: ' .. dbg)
+print('Semi-suprevised training. Method: ' .. method .. ', arch: ' .. arch.. ', set: ' .. set.. ', mode: ' .. dbg)
 
 math.randomseed(0); 
 torch.manualSeed(0)
 
 ---------------------------- initialize / load networks 
 
-local _METRIC_NET_, hpatch
-_METRIC_NET_, hpatch = nnMetric.get(metric)
+local _SIAM_NET_, hpatch
+
+do
+  local embed_net = nnMetric.getEmbeddNet(arch)
+  local head_net  = nnMetric.getHeadNet(arch)
+  _SIAM_NET_ = nnMetric.setupSiamese(embed_net, head_net, 100, 10)
+  hpatch = nnMetric.getHPatch(embed_net)
+end
+--
+--_SIAM_NET_, hpatch = nnMetric_old.get('mc-cnn-fst-kitti')
+
+--
 _OPTIM_STATE_ = {}
 _TRAIN_LOG_ = {}
 
@@ -111,8 +129,8 @@ _TRAIN_LOG_ = {}
 if( opt.debug_start_from_net ~= '' ) then
   if utils.file_exists(opt.debug_start_from_net) then
     local tmp = torch.load(opt.debug_start_from_net, 'ascii')      
-    _METRIC_NET_ = tmp[1]
-    _OPTIM_STATE = tmp[2]
+    _SIAM_NET_ = tmp[1]
+    _OPTIM_STATE_ = tmp[2]
     _TRAIN_LOG_  = tmp[3]
     print('Continue training from network specified by user\n')
   else
@@ -122,9 +140,9 @@ else
   local default_net = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. '.t7'
   if utils.file_exists(default_net) then
     local tmp = torch.load(default_net, 'ascii')      
-    _METRIC_NET_ = tmp[1]
-    _OPTIM_STATE = tmp[2]
-    _TRAIN_LOG_  = tmp[3]
+    _SIAM_NET_ = tmp[1]
+    _OPTIM_STATE_ = tmp[2]
+    _TRAIN_LOG_ = tmp[3]
     print('Continue training from default network\n')
   else
     print('Could not find default network. Starting from the beggining.\n')
@@ -139,10 +157,11 @@ if _OPTIM_STATE_.m then
 end
 
 -- metric on cuda
-_METRIC_NET_:cuda()
+_SIAM_NET_:cuda()
+--cudnn.convert(_SIAM_NET_, cudnn)
 
 -- get metric network parameter
-_METRIC_PPARAM_, _METRIC_PGRAD_ = _METRIC_NET_:getParameters() 
+_SIAM_PPARAM_, _SIAM_PGRAD_ = _SIAM_NET_:getParameters() 
 
 ---------------------------- initialize dataset
 
@@ -185,7 +204,6 @@ elseif set == 'mb' then
   
 end
 
-
 -- |define optimization function|
 feval = function(x)
 
@@ -195,7 +213,7 @@ feval = function(x)
   _TR_LOSS_ = 0;   
   
   -- clear gradients
-  _METRIC_PGRAD_:zero()
+  _SIAM_PGRAD_:zero()
   
   local nb_comp_ttl = 0; 
   local criterion, tr_net
@@ -212,15 +230,23 @@ feval = function(x)
     if( _WIDTH_TAB_[nsample] ~= _WIDTH_TAB_[nsample-1] or _DISP_TAB_[nsample] ~= _DISP_TAB_[nsample-1] )  then
     
       if( method == 'contrastive-dp' ) then
-        tr_net, criterion = trainerNet.getContrastiveDP(_WIDTH_TAB_[nsample], _DISP_TAB_[nsample],hpatch, opt['th_sup'],  opt['th_occ'],  opt['loss_margin'], _METRIC_NET_:clone():double())  
+        
+        
+        local embed_net, head_net = nnMetric.parseSiamese(_SIAM_NET_:clone():double())
+        local siam_net = nnMetric.setupSiamese(embed_net, head_net, _WIDTH_TAB_[nsample], _DISP_TAB_[nsample] )
+        tr_net, criterion = trainerNet.getContrastiveDP(_WIDTH_TAB_[nsample], _DISP_TAB_[nsample],hpatch, opt['th_sup'],  opt['th_occ'],  opt['loss_margin'], siam_net:clone())  
+          
+       -- tr_net, criterion = trainerNet.getContrastiveDP(_WIDTH_TAB_[nsample], _DISP_TAB_[nsample],hpatch, opt['th_sup'],  opt['th_occ'],  opt['loss_margin'], _SIAM_NET_:clone():double())  
+          
       else
-        -- TO-DO
+        
       end
     
       -- put training network on cuda
       tr_net:cuda()
       criterion:cuda()
-      
+      cudnn.convert(tr_net, cudnn)
+            
       tr_param, tr_grad = tr_net:getParameters() 
     
     end
@@ -229,6 +255,8 @@ feval = function(x)
     
     --_METRIC_NET_:forward({torch.rand(1,9,1242):cuda(), torch.rand(1,9,1242):cuda()})
     -- forward pass through net
+    
+    
     tr_net:forward(sample_input)
     
     -- number of nonempty output tabels
@@ -258,14 +286,14 @@ feval = function(x)
     end
   
     -- copy gradients to base net
-    _METRIC_PGRAD_:add(tr_grad)
+    _SIAM_PGRAD_:add(tr_grad)
     
   end
  
   _TR_LOSS_ = _TR_LOSS_ / nb_comp_ttl
-  _METRIC_PGRAD_:div(nb_comp_ttl);
-
-  return _TR_LOSS_, _METRIC_PGRAD_
+  _SIAM_PGRAD_:div(nb_comp_ttl);
+  
+  return _TR_LOSS_, _SIAM_PGRAD_
 end
 
 -- go through epoches
@@ -293,7 +321,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
    end
        
    -- optimize 
-   optim.adam(feval, _METRIC_PPARAM_, {}, _OPTIM_STATE_)    
+   optim.adam(feval, _SIAM_PPARAM_, {}, _OPTIM_STATE_)    
    table.insert(sample_loss, _TR_LOSS_)
    
    collectgarbage()
@@ -318,9 +346,9 @@ for nepoch = 1, opt['train_nb_epoch'] do
   else
     set_name = set
   end
-  local str = './main.lua ' .. set_name .. ' our_fast -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
+  local str = './main.lua ' .. set_name .. ' our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
   tmp = {};
-  tmp[1] = _METRIC_NET_:clone():double()
+  tmp[1] = _SIAM_NET_:clone():double()
   torch.save(net_fname, tmp, 'ascii');
   lfs.chdir('../mc-cnn')
   local handle = io.popen(str)
@@ -338,7 +366,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
   
   -- save network
   local tmp = {}
-  tmp[1] = _METRIC_NET_:clone():double()
+  tmp[1] = _SIAM_NET_:clone():double()
   local optim_state = {}
   optim_state.t = _OPTIM_STATE_.t;
   optim_state.m = _OPTIM_STATE_.m:double();

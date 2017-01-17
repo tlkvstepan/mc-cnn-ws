@@ -14,9 +14,6 @@ module purge
 module load cuda/7.0
 module load torch/7
 module load opencv/3.0.0-rc1/gcc-4.4.7
-th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua debug contrast-dprog kitti -maxsup_th 0 -debug_fname 'contrast-dprog-maxsup0' 
-
-echo T_SUP FOR KITTI_EXT `date`
-
+th /home/tulyakov/research/mil-mc-cnn/TRAIN_NET.lua tune contrastive-dp mc-cnn-fst-kitti kitti_ext -th_sup 0 -debug_fname 'contrast-dprog-maxsup0' 
 echo FINISHED at `date`
 

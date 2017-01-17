@@ -16,7 +16,7 @@ local unsupKITTI = torch.class('unsupKITTI')
     self.height = 370
     self.width = 1242;
     self.nb_epi_per_image = 30; 
-    
+        
     if setName == 'kitti' or setName == 'kitti_ext' then
         
         self.im0_fname = baseFolder .. '/%s/image_0/%06d_%02d.png' 
@@ -43,22 +43,17 @@ local unsupKITTI = torch.class('unsupKITTI')
     end
   
     self.nbIm = (self.test_nbIm + self.train_nbIm)*self.nbFrames     
-   -- self:subset(1); 
+    --self.activeList = torch.randperm(self.nbIm) 
      
   end
   
     
 --  function unsupKITTI:subset( prc )
     
---    self.nbImActive = math.ceil(prc*self.nbIm)
-    
---    if( self.nbImActive == 1 )then 
---      error('Subset is too small')
---    end
-    
---    self.imActive = torch.randperm(self.nbIm)-1
---    self.imActive = self.imActive[{{1,self.nbImActive}}] 
-  
+--     local n = math.ceil(prc*self.nbIm)
+--     self.activeList = torch.randperm(self.nbIm) 
+--     self.activeList = self.activeList[{{1,n}}]
+     
 --  end
     
   function unsupKITTI:get( batch_size )

@@ -51,24 +51,31 @@ function contrastDprog:updateOutput(input)
   
   local E_masked = input -- cuda if cuda mode
   local E_masked_VEC = E_masked:view(dim*dim)
-  local indices = self.pathNonOcc:float():nonzero() -- cuda not supported for this opperation
-  if( input:type() == "torch.CudaTensor"  )then
-    indices = indices:cuda()
-  end
+  local indices = self.pathNonOcc:nonzero() -- cuda not supported for this opperation
+  --if( input:type() == "torch.CudaTensor"  )then
+ -- local indices = torch.CudaLongTensor()
+  --indices:resize(indices:size())
+  --indices = indices:cuda()
+  --end
   
   -- if there are nonoccluded path segments
-  if indices:numel() > 0 then
-    
+  
+  if indices:numel() > 2 then
+ 
     self.rows = indices:select(2,1)
     self.cols = indices:select(2,2)
-    
+ 
     -- mask energy array
+    local rowsMask = torch.CudaTensor()
+    local colsMask = torch.CudaTensor()
+    rowsMask:resize(self.rows:size())
+    colsMask:resize(self.cols:size())
     for dy = -self.distMin,self.distMin do
-      local rowsMask = self.rows + dy;
+      rowsMask:copy(self.rows + dy);
       rowsMask[rowsMask:gt(dim)] = dim;
       rowsMask[rowsMask:lt(1)] = 1;
       for dx = -self.distMin,self.distMin do
-        local colsMask = self.cols + dx;
+        colsMask:copy(self.cols + dx);
         colsMask[colsMask:gt(dim)] = dim;
         colsMask[colsMask:lt(1)] = 1;
         local idx = colsMask + (rowsMask-1)*dim
@@ -78,11 +85,15 @@ function contrastDprog:updateOutput(input)
 
     -- compute maximum
     self.rowwiseMaxE, self.rowwiseMaxI = E_masked:max(2)
-    self.rowwiseMaxE = self.rowwiseMaxE:index(1,self.rows):squeeze()
-    self.rowwiseMaxI = self.rowwiseMaxI:index(1,self.rows):squeeze()
+    self.rowwiseMaxE = self.rowwiseMaxE:index(1,self.rows):squeeze():cuda()
+    self.rowwiseMaxI = self.rowwiseMaxI:index(1,self.rows):squeeze():cuda()
     self.colwiseMaxE, self.colwiseMaxI = E_masked:max(1)
-    self.colwiseMaxE = self.colwiseMaxE:index(2,self.cols):squeeze()
-    self.colwiseMaxI = self.colwiseMaxI:index(2,self.cols):squeeze()
+    self.colwiseMaxE = self.colwiseMaxE:index(2,self.cols):squeeze():cuda()
+    self.colwiseMaxI = self.colwiseMaxI:index(2,self.cols):squeeze():cuda()
+    
+    self.rows = self.cols:cuda()
+    self.cols = self.cols:cuda() 
+    
     
     self.output = {{dprogE, self.rowwiseMaxE}, {dprogE, self.colwiseMaxE}}
   
@@ -106,7 +117,7 @@ function contrastDprog:updateGradInput(input, gradOutput)
    local dim = input:size(1);
    local gradInput_vec = self.gradInput:view(dim*dim) 
    local idx;
-   
+
    idx = (self.cols) + (self.rows-1)*dim;
    gradInput_vec:indexAdd(1, idx, gradOutput_dprog1)
    gradInput_vec:indexAdd(1, idx, gradOutput_dprog2)
