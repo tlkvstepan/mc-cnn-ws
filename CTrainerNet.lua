@@ -480,7 +480,7 @@ local trainerNet = {}
 function trainerNet.getContrastiveDP(img_w, disp_max, hpatch, dist_min, occ_th, loss_margin, metricNet)  
 
 
-local Net = metricNet:clone()
+local Net = metricNet:clone('weight','bias', 'gradWeight','gradBias')
 --local Net = nn.Sequential()
 
 -- pass ref and pos epipolar lines through feature net and normalize outputs

@@ -22,9 +22,7 @@ debug contrastive-dp acrt-kitti kitti
 ]]--
 
 
--- --
 ------------------------ read modules
-
 
 -- standard modules
 require 'gnuplot'
@@ -45,29 +43,29 @@ dofile('CAddMatrix.lua')                  -- Module that adds constant matrix to
 require 'libdprog'                        -- C++ module for dynamic programming
 dofile('CContrastDprog.lua');             -- Contrastive dynamic programming module
 dofile('CContrastMax.lua');               -- Contrastive max-2ndMax module
---dofile('CMilDprog.lua');
---dofile('CMilContrastDprog.lua')
---dofile('DataLoader.lua');                 -- Parent class for dataloaders
---dofile('CUnsupSet.lua')     
 dofile('copyElements.lua')
 dofile('fixedIndex.lua')
 dofile('CUnsupMB.lua')                     -- MB
 dofile('CUnsupKITTI.lua')
---dofile('CSup2EpiSet.lua');                 -- Supervised validation set loader
 nnMetric = dofile('nnMetric.lua');         -- Function that makes base net
 trainerNet = dofile('CTrainerNet.lua')    -- Function that "wrap" base net into training net
 testFun = dofile('CTestUtils.lua');         -- Function that performs test on validation set
 utils = dofile('utils.lua');              -- Utils for loading and visualization
 
-
-
 ----------------------------- parse input parameters
+
 dbg = table.remove(arg, 1) 
 method = table.remove(arg, 1)
 arch = table.remove(arg, 1)
 set = table.remove(arg, 1)
 
 cmd = torch.CmdLine()
+
+-- debug setting
+dbg = dbg or 'debug';
+method = method or 'contrastive-dp'
+arch = arch or 'fst-mb'
+set = set or 'mb'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'contrastive-dp')
 assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti')
@@ -83,9 +81,9 @@ elseif dbg == 'tune' then
   cmd:option('-train_nb_batch', 100)        
   cmd:option('-train_nb_epoch', 5)        
 else 
-  cmd:option('-train_batch_size', 370)     
-  cmd:option('-train_nb_batch', 10)        
-  cmd:option('-train_nb_epoch', 5)        
+  cmd:option('-train_batch_size', 128)     
+  cmd:option('-train_nb_batch', 1)        
+  cmd:option('-train_nb_epoch', 10)        
 end
 
 -- semi-supervised method parameters
@@ -94,7 +92,7 @@ cmd:option('-th_sup', 2)
 cmd:option('-th_occ', 1)    
 
 -- dbg
-cmd:option('-debug_fname', 'equival-check')
+cmd:option('-debug_fname', 'test-5')
 cmd:option('-debug_start_from_net', '')
 
 opt = cmd:parse(arg)
@@ -111,17 +109,16 @@ torch.manualSeed(0)
 ---------------------------- initialize / load networks 
 
 local _SIAM_NET_, hpatch
+local _EMBED_NET_;
+local _HEAD_NET_;
 
 do
-  local embed_net = nnMetric.getEmbeddNet(arch)
-  local head_net  = nnMetric.getHeadNet(arch)
+  embed_net = nnMetric.getEmbeddNet(arch)
+  head_net  = nnMetric.getHeadNet(arch)
   _SIAM_NET_ = nnMetric.setupSiamese(embed_net, head_net, 100, 10)
   hpatch = nnMetric.getHPatch(embed_net)
 end
---
---_SIAM_NET_, hpatch = nnMetric_old.get('mc-cnn-fst-kitti')
 
---
 _OPTIM_STATE_ = {}
 _TRAIN_LOG_ = {}
 
@@ -146,6 +143,7 @@ else
     print('Continue training from default network\n')
   else
     print('Could not find default network. Starting from the beggining.\n')
+    
   end
 end
 
@@ -156,12 +154,10 @@ if _OPTIM_STATE_.m then
   _OPTIM_STATE_.denom = _OPTIM_STATE_.denom:cuda()
 end
 
--- metric on cuda
-_SIAM_NET_:cuda()
---cudnn.convert(_SIAM_NET_, cudnn)
+_SIAM_NET_:cuda();
+_SIAM_NET_PARAM_, _SIAM_NET_PGRAD_ = _SIAM_NET_:getParameters() 
+_EMBED_NET_, _HEAD_NET_ =  nnMetric.parseSiamese(_SIAM_NET_);  -- automatically on cuda
 
--- get metric network parameter
-_SIAM_PPARAM_, _SIAM_PGRAD_ = _SIAM_NET_:getParameters() 
 
 ---------------------------- initialize dataset
 
@@ -213,7 +209,7 @@ feval = function(x)
   _TR_LOSS_ = 0;   
   
   -- clear gradients
-  _SIAM_PGRAD_:zero()
+  _SIAM_NET_PGRAD_:zero()
   
   local nb_comp_ttl = 0; 
   local criterion, tr_net
@@ -231,13 +227,10 @@ feval = function(x)
     
       if( method == 'contrastive-dp' ) then
         
-        
-        local embed_net, head_net = nnMetric.parseSiamese(_SIAM_NET_:clone():double())
-        local siam_net = nnMetric.setupSiamese(embed_net, head_net, _WIDTH_TAB_[nsample], _DISP_TAB_[nsample] )
-        tr_net, criterion = trainerNet.getContrastiveDP(_WIDTH_TAB_[nsample], _DISP_TAB_[nsample],hpatch, opt['th_sup'],  opt['th_occ'],  opt['loss_margin'], siam_net:clone())  
-          
-       -- tr_net, criterion = trainerNet.getContrastiveDP(_WIDTH_TAB_[nsample], _DISP_TAB_[nsample],hpatch, opt['th_sup'],  opt['th_occ'],  opt['loss_margin'], _SIAM_NET_:clone():double())  
-          
+        -- this siamese net share parameters
+        local siam_net = nnMetric.setupSiamese(_EMBED_NET_, _HEAD_NET_, _WIDTH_TAB_[nsample], _DISP_TAB_[nsample] )
+        tr_net, criterion = trainerNet.getContrastiveDP(_WIDTH_TAB_[nsample], _DISP_TAB_[nsample],hpatch, opt['th_sup'],  opt['th_occ'],  opt['loss_margin'], siam_net)  
+       
       else
         
       end
@@ -246,17 +239,10 @@ feval = function(x)
       tr_net:cuda()
       criterion:cuda()
       cudnn.convert(tr_net, cudnn)
-            
-      tr_param, tr_grad = tr_net:getParameters() 
-    
+       
     end
     
-    tr_grad:zero()
-    
-    --_METRIC_NET_:forward({torch.rand(1,9,1242):cuda(), torch.rand(1,9,1242):cuda()})
-    -- forward pass through net
-    
-    
+       
     tr_net:forward(sample_input)
     
     -- number of nonempty output tabels
@@ -284,16 +270,13 @@ feval = function(x)
     
     end
     end
-  
-    -- copy gradients to base net
-    _SIAM_PGRAD_:add(tr_grad)
-    
+     
   end
  
   _TR_LOSS_ = _TR_LOSS_ / nb_comp_ttl
-  _SIAM_PGRAD_:div(nb_comp_ttl);
+  _SIAM_NET_PGRAD_:div(nb_comp_ttl);
   
-  return _TR_LOSS_, _SIAM_PGRAD_
+  return _TR_LOSS_, _SIAM_NET_PGRAD_
 end
 
 -- go through epoches
@@ -321,7 +304,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
    end
        
    -- optimize 
-   optim.adam(feval, _SIAM_PPARAM_, {}, _OPTIM_STATE_)    
+   optim.adam(feval, _SIAM_NET_PARAM_, {}, _OPTIM_STATE_)    
    table.insert(sample_loss, _TR_LOSS_)
    
    collectgarbage()

@@ -91,7 +91,7 @@ function contrastDprog:updateOutput(input)
     self.colwiseMaxE = self.colwiseMaxE:index(2,self.cols):squeeze():cuda()
     self.colwiseMaxI = self.colwiseMaxI:index(2,self.cols):squeeze():cuda()
     
-    self.rows = self.cols:cuda()
+    self.rows = self.rows:cuda()
     self.cols = self.cols:cuda() 
     
     

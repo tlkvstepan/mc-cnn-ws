@@ -98,20 +98,21 @@ end
 
 
 -- Function parse siamese net into embedding net and head net
+-- (output headNet and embedNet share storage with original net)
 function nnMetric.parseSiamese(siamNet) 
     
-  local embedNet = siamNet.modules[1].modules[1]:clone()  
+  local embedNet = siamNet.modules[1].modules[1]:clone('weight','bias', 'gradWeight','gradBias');  
   embedNet:remove(8) -- delete squeeze and transpose
   embedNet:remove(8)
-  
-    
-  local headNet =  siamNet.modules[3]:clone()  
+      
+  local headNet =  siamNet.modules[3]:clone('weight','bias', 'gradWeight','gradBias');  
   
   return embedNet, headNet
   
 end
 
--- Function sets up siamese net 
+-- Function sets up siamese net, given headNet and embedNet
+-- (new netwok use same storage for parameters)
 function nnMetric.setupSiamese(embedNet, headNet, width, dispMax)
 
 local siamNet =  nn.Sequential()
@@ -151,12 +152,13 @@ end
 local twoEmbedNet 
 
 ---------------------- Make two embeded nets -------------------------------------------
+-- all networks share parameters and gradient storage with the embed network
 do
     
   twoEmbedNet =  nn.ParallelTable()
   
   -- make two towers
-  local embedNet0 = embedNet:clone()
+  local embedNet0 = embedNet:clone('weight','bias', 'gradWeight','gradBias');
 
   -- nb_features x 1 x width-hpatch*2 ==> width-hpatch*2 x nb_features
   embedNet0:add(nn.Squeeze(2))
@@ -192,10 +194,8 @@ end
 
 siamNet:add(pairSelNet)
 
-siamNet:add(headNet)
-
---siamNet:add( nn.Squeeze(2) )
-
+headNet_copy = headNet:clone('weight','bias', 'gradWeight','gradBias');
+siamNet:add(headNet_copy)
 
 siamNet:add(nn.copyElements(torch.LongStorage{nbActivePairs}, torch.LongStorage{width-hpatch*2, width-hpatch*2}, torch.range(1, nbActivePairs), activeIdx))
 
