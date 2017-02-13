@@ -9,21 +9,18 @@
 
 --]]
 
-local contrastDprog, parent = torch.class('nn.contrastDprog', 'nn.Module')
+local contrastiveDP, parent = torch.class('nn.contrastiveDP', 'nn.Module')
 
-function contrastDprog:__init(distMin, occTh)
+function contrastiveDP:__init(th_sup, th_occ)
    parent.__init(self)
-   self.distMin = distMin
-   self.occTh = occTh 
+   self.th_sup = th_sup
+   self.th_occ = th_occ 
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
    self.cols = torch.Tensor()
    self.rows = torch.Tensor()
-   --self.rowwiseMaxI = torch.Tensor()
-   --self.colwiseMaxI = torch.Tensor()
- 
 end
 
-function contrastDprog:updateOutput(input)
+function contrastiveDP:updateOutput(input)
   
   local dim = input:size(1)
   
@@ -44,8 +41,8 @@ function contrastDprog:updateOutput(input)
   self.pathNonOcc = self.pathNonOcc or input:clone() -- cuda if cuda mode
   self.pathNonOcc:copy(self.path)
   
-  local mask = torch.repeatTensor(self.pathNonOcc:sum(2):gt(self.occTh), 1, dim)
-  mask:add(torch.repeatTensor(self.pathNonOcc:sum(1):gt(self.occTh), dim, 1))
+  local mask = torch.repeatTensor(self.pathNonOcc:sum(2):gt(self.th_occ), 1, dim)
+  mask:add(torch.repeatTensor(self.pathNonOcc:sum(1):gt(self.th_occ), dim, 1))
   self.pathNonOcc[mask] = 0;
   local dprogE = input[self.pathNonOcc:byte()]
   
@@ -70,11 +67,11 @@ function contrastDprog:updateOutput(input)
     local colsMask = torch.CudaTensor()
     rowsMask:resize(self.rows:size())
     colsMask:resize(self.cols:size())
-    for dy = -self.distMin,self.distMin do
+    for dy = -self.th_sup,self.th_sup do
       rowsMask:copy(self.rows + dy);
       rowsMask[rowsMask:gt(dim)] = dim;
       rowsMask[rowsMask:lt(1)] = 1;
-      for dx = -self.distMin,self.distMin do
+      for dx = -self.th_sup,self.th_sup do
         colsMask:copy(self.cols + dx);
         colsMask[colsMask:gt(dim)] = dim;
         colsMask[colsMask:lt(1)] = 1;
@@ -106,7 +103,7 @@ function contrastDprog:updateOutput(input)
   return self.output
 end
 
-function contrastDprog:updateGradInput(input, gradOutput)
+function contrastiveDP:updateGradInput(input, gradOutput)
       
    local fwd, bwd  = unpack(gradOutput)
    local gradOutput_dprog1, gradOutput_row = unpack(fwd)

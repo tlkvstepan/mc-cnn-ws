@@ -1,11 +1,11 @@
-local nnMetric = {}
+local cnnMetric = {}
  
 --------------------------------------------------------------------------------- 
 ------------------- User interface functions ------------------------------------
 ---------------------------------------------------------------------------------
 
 -- Function returns embedding net given network name 
-function nnMetric.getEmbeddNet(metricName)
+function cnnMetric.getEmbeddNet(metricName)
     
   assert( metricName == 'fst-mb' or
           metricName == 'fst-kitti' or
@@ -42,7 +42,7 @@ function nnMetric.getEmbeddNet(metricName)
       
   end
       
-  local embedNet = nnMetric.embeddNet( nbConvLayers, nbFeatureMap, kernel )
+  local embedNet = cnnMetric.embeddNet( nbConvLayers, nbFeatureMap, kernel )
   
   --if ( metricName == 'acrt-mb' or metricName == 'acrt-kitti' ) then
   --  embedNet:add( nn.ReLU() )         -- add nonlinearity to last layer of embed net for accurate architecture
@@ -53,7 +53,7 @@ function nnMetric.getEmbeddNet(metricName)
 end
 
 -- Function returns head net given network name 
-function nnMetric.getHeadNet(metricName)
+function cnnMetric.getHeadNet(metricName)
     
   assert( metricName == 'fst-mb' or
           metricName == 'fst-kitti' or
@@ -66,7 +66,7 @@ function nnMetric.getHeadNet(metricName)
   
     local nbFeatureMap = 64
     
-    headNet = nnMetric.cosHead(nbFeatureMap)
+    headNet = cnnMetric.cosHead(nbFeatureMap)
     
   elseif( metricName == 'acrt-mb' ) then
     
@@ -74,21 +74,21 @@ function nnMetric.getHeadNet(metricName)
     local nbFcLayers    = 3
     local nbFcUnits     = 384
     
-    headNet = nnMetric.fcHead(nbFeatureMap, nbFcLayers, nbFcUnits)
+    headNet = cnnMetric.fcHead(nbFeatureMap, nbFcLayers, nbFcUnits)
   
   elseif( metricName == 'fst-kitti' ) then
   
     local nbFeatureMap = 64
     
-    headNet = nnMetric.cosHead(nbFeatureMap)
+    headNet = cnnMetric.cosHead(nbFeatureMap)
         
   elseif( metricName == 'acrt-kitti' ) then
     
-    local nbFeatureMap  = 112
-    local nbFcLayers    = 4
+    local nbFeatureMap  = 112 --
+    local nbFcLayers    = 4       
     local nbFcUnits     = 384
         
-    headNet = nnMetric.fcHead(nbFeatureMap, nbFcLayers, nbFcUnits)
+    headNet = cnnMetric.fcHead(nbFeatureMap, nbFcLayers, nbFcUnits)
     
   end
       
@@ -99,7 +99,7 @@ end
 
 -- Function parse siamese net into embedding net and head net
 -- (output headNet and embedNet share storage with original net)
-function nnMetric.parseSiamese(siamNet) 
+function cnnMetric.parseSiamese(siamNet) 
     
   local embedNet = siamNet.modules[1].modules[1]:clone('weight','bias', 'gradWeight','gradBias');  
   embedNet:remove(8) -- delete squeeze and transpose
@@ -113,38 +113,43 @@ end
 
 -- Function sets up siamese net, given headNet and embedNet
 -- (new netwok use same storage for parameters)
-function nnMetric.setupSiamese(embedNet, headNet, width, dispMax)
+function cnnMetric.setupSiamese(embedNet, headNet, width, disp_max)
 
 local siamNet =  nn.Sequential()
 
-local hpatch = nnMetric.getHPatch(embedNet)
+local hpatch = cnnMetric.getHPatch(embedNet)
 
-local  activeRows 
-local  activeCols
-local  activeIdx
-local  nbActivePairs
+--local  activeRows 
+--local  activeCols
+--local  activeIdx
+--local  nbActivePairs
+local active_pairs
 
 ---------------------- Find active elementes of similarity matrix --------------------
 do 
     
-  local row = torch.Tensor(width-hpatch*2, 1)
-  row[{{},{1}}] = torch.range(1, width-hpatch*2)
-  local rows = torch.repeatTensor(row, 1, width-hpatch*2)
+--  local row = torch.Tensor(width-hpatch*2, 1)
+--  row[{{},{1}}] = torch.range(1, width-hpatch*2)
+--  local rows = torch.repeatTensor(row, 1, width-hpatch*2)
 
-  local col = row:t():clone()
-  local cols = torch.repeatTensor(col, width-hpatch*2, 1)
+--  local col = row:t():clone()
+--  local cols = torch.repeatTensor(col, width-hpatch*2, 1)
 
-  local disp = rows - cols 
-  local mask = disp:le(dispMax):cmul( disp:gt(0) )
+--  local disp = rows - cols 
+--  local mask = disp:le(disp_max):cmul( disp:gt(0) )
 
-  activeIdx = (cols-1) + (rows-1)*(width-hpatch*2) + 1
-  activeIdx = activeIdx[mask] 
+--  activeIdx = (cols-1) + (rows-1)*(width-hpatch*2) + 1
+--  activeIdx = activeIdx[mask] 
 
-  activeCols = cols[mask]
-  activeRows = rows[mask]
+--  activeCols = cols[mask]
+--  activeRows = rows[mask]
 
-  nbActivePairs = mask:ne(0):sum()
+--  nbActivePairs = mask:ne(0):sum()
 
+    mask = torch.ones(width-2*hpatch, width-2*hpatch)*2 
+    mask = torch.triu(torch.tril(mask,-1),-disp_max)
+        
+    active_pairs = mask:nonzero()
 end
 
 ------------------------------------------------------------------
@@ -172,32 +177,32 @@ do
 
 end
 
-
-
+siamNet:add(twoEmbedNet)
 ----------------------------------------------------------------------------------------
 
-siamNet:add(twoEmbedNet)
+siamNet:add(nn.headNetMulti(active_pairs, headNet))
 
-local pairSelNet
+--siamNet:add(twoEmbedNet)
 
------------------------ Make two pair selecting nets ------------------------------------
-do 
+--local pairSelNet
+
+------------------------- Make two pair selecting nets ------------------------------------
+--do 
   
-  pairSelNet =  nn.ParallelTable()
-  
-  pairSelNet:add(nn.fixedIndex(1, activeRows:long()))
-  pairSelNet:add(nn.fixedIndex(1, activeCols:long()))
+--  pairSelNet =  nn.ParallelTable()
+--  pairSelNet:add(nn.fixedIndex(1, activeRows:long()))
+--  pairSelNet:add(nn.fixedIndex(1, activeCols:long()))
 
-end
+--end
 
------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
 
-siamNet:add(pairSelNet)
+--siamNet:add(pairSelNet)
 
-headNet_copy = headNet:clone('weight','bias', 'gradWeight','gradBias');
-siamNet:add(headNet_copy)
+--headNet_copy = headNet:clone('weight','bias', 'gradWeight','gradBias');
+--siamNet:add(headNet_copy)
 
-siamNet:add(nn.copyElements(torch.LongStorage{nbActivePairs}, torch.LongStorage{width-hpatch*2, width-hpatch*2}, torch.range(1, nbActivePairs), activeIdx))
+--siamNet:add(nn.copyElements(torch.LongStorage{nbActivePairs}, torch.LongStorage{width-hpatch*2, width-hpatch*2}, torch.range(1, nbActivePairs), activeIdx))
 
   return siamNet 
 end
@@ -268,9 +273,11 @@ end
 --end
 
 
-function nnMetric.padBoundary(net)
+function cnnMetric.padBoundary(net)
   for i =  1,#net.modules do
-    if torch.typename(net.modules[i]) == 'nn.SpatialConvolution' then
+    if torch.typename(net.modules[i]) == 'cudnn.SpatialConvolution' or
+       torch.typename(net.modules[i]) == 'nn.SpatialConvolution' or 
+       torch.typename(net.modules[i]) == 'cunn.SpatialConvolution' then
       net.modules[i].padW = 1
       net.modules[i].padH = 1
     end
@@ -278,13 +285,15 @@ function nnMetric.padBoundary(net)
   return net;
 end
 
-function nnMetric.isParametric(net)
+function cnnMetric.isParametric(net)
    for i = 1,#net.modules do
       local module = net:get(i)
-      if torch.typename(module) == 'cudnn.SpatialConvolution' or
+      if torch.typename(module) == 'cudnn.Linear' or 
+         torch.typename(module) == 'cudnn.SpatialConvolution' or
          torch.typename(module) == 'nn.SpatialConvolution' or 
          torch.typename(module) == 'nn.Linear' or 
-         torch.typename(module) == 'cudnn.Linear' then
+         torch.typename(module) == 'cunn.SpatialConvolution' or 
+         torch.typename(module) == 'cunn.Linear' then
          return true;
       end
    end
@@ -292,11 +301,13 @@ function nnMetric.isParametric(net)
 end
 
 
-function nnMetric.getHPatch(embeddNet)
+function cnnMetric.getHPatch(embeddNet)
    local ws = 1
    for i = 1,#embeddNet.modules do
       local module = embeddNet:get(i)
-      if torch.typename(module) == 'cudnn.SpatialConvolution' or torch.typename(module) == 'nn.SpatialConvolution' then
+      if torch.typename(module) == 'cudnn.SpatialConvolution' or 
+         torch.typename(module) == 'nn.SpatialConvolution' or
+         torch.typename(module) == 'cunn.SpatialConvolution' then
          ws = ws + module.kW - 1
       end
    end
@@ -310,7 +321,7 @@ end
 -- Given tensor 1 x hpatch*2 x width embedding net produces feature 
 -- tensor of size 64 x 1 x width-hpatch*2 
 
-function nnMetric.embeddNet( nbConvLayers, nbFeatureMap, kernel )     
+function cnnMetric.embeddNet( nbConvLayers, nbFeatureMap, kernel )     
     
   local fNet = nn.Sequential();
   
@@ -359,7 +370,7 @@ end
 -- distance tensor of size nb_pairs 
 
 -- fully connected linear net
-function nnMetric.fcHead(nbFeatureMap, nbFcLayers, nbFcUnits)
+function cnnMetric.fcHead(nbFeatureMap, nbFcLayers, nbFcUnits)
 
   local fcHead =  nn.Sequential()
   fcHead:add( nn.JoinTable(2) )
@@ -377,7 +388,7 @@ function nnMetric.fcHead(nbFeatureMap, nbFcLayers, nbFcUnits)
 end
 
 -- cosine head
-function nnMetric.cosHead(nbFeatureMap)
+function cnnMetric.cosHead(nbFeatureMap)
   
   local cosNet = nn.Sequential()
   local normNet = nn.ParallelTable()
@@ -394,4 +405,4 @@ function nnMetric.cosHead(nbFeatureMap)
   
 end
 
-return nnMetric
+return cnnMetric

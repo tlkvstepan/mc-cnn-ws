@@ -1,6 +1,6 @@
 local trainerNet = {}
 
---function trainerNet.getMilContrastDprog(img_w, disp_max, hpatch, dist_min, occ_th, loss_margin, fnet)
+--function trainerNet.getMilContrastDprog(img_w, disp_max, hpatch, dist_min, th_occ, loss_margin, fnet)
 
 --local fNetRef = fnet:clone();
  
@@ -20,6 +20,25 @@ local trainerNet = {}
 
 ---- compute 3 cross products: ref and pos, ref and neg, pos and neg
 --local fNets2dNetCom = nn.ConcatTable()
+--Net:add(fNets2dNetCom); -- feature net to distance net commutator
+--local dNetRefPos = nn.Sequential()
+--local dNetRefNeg = nn.Sequential()
+--local dNetNegPos = nn.Sequential()
+--fNets2dNetCom:add(dNetRefPos)
+--fNets2dNetCom:add(dNetRefNeg)
+--fNets2dNetCom:add(dNetNegPos)
+--local dNetRefPosSel = nn.ConcatTable()  -- input selectors for each distance net
+--local dNetRefNegSel = nn.ConcatTable()
+--local dNetNegPosSel = nn.ConcatTable()
+--dNetRefPos:add(dNetRefPosSel)
+--dNetRefNeg:add(dNetRefNegSel)
+--dNetNegPos:add(dNetNegPosSel)
+--dNetRefPosSel:add(nn.SelectTable(1))
+--dNetRefPosSel:add(nn.SelectTable(2))
+--dNetRefNegSel:add(nn.SelectTable(1))
+--dNetRefNegSel:add(nn.SelectTable(3))
+--dNetNegPosSel:add(nn.SelectTable(3))
+--dNetNegPosSel:add(nn.SelectTable(2))--local fNets2dNetCom = nn.ConcatTable()
 --Net:add(fNets2dNetCom); -- feature net to distance net commutator
 --local dNetRefPos = nn.Sequential()
 --local dNetRefNeg = nn.Sequential()
@@ -67,7 +86,7 @@ local trainerNet = {}
 --dNetNegPos:add(nn.MulConstant(0.5))
 
 ---- milContrastDprog
---Net:add(nn.milContrastDprog(dist_min, occ_th))
+--Net:add(nn.milContrastDprog(dist_min, th_occ))
 
 ---- define criterion
 ---- loss(x(+), x(-)) = max(0,  - x(+) + x(-)  + prm['loss_margin'])
@@ -351,7 +370,7 @@ local trainerNet = {}
 
 --end
 
---function trainerNet.getMilDprog(img_w, disp_max, hpatch, occ_th, loss_margin,  fnet)
+--function trainerNet.getMilDprog(img_w, disp_max, hpatch, th_occ, loss_margin,  fnet)
 
 --local fNetRef = fnet:clone();
  
@@ -417,7 +436,7 @@ local trainerNet = {}
 --dNetNegPos:add(nn.MulConstant(0.5))
 
 ---- milDprog
---Net:add(nn.milDprog(occ_th))
+--Net:add(nn.milDprog(th_occ))
 
 --local milFwdCst = nn.MarginRankingCriterion(loss_margin);
 --local milBwdCst = nn.MarginRankingCriterion(loss_margin);
@@ -477,29 +496,99 @@ local trainerNet = {}
 --return Net, criterion
 --end 
 
-function trainerNet.getContrastiveDP(img_w, disp_max, hpatch, dist_min, occ_th, loss_margin, metricNet)  
+function trainerNet.getMil(disp_max, width, loss_margin, embed_net, head_net)
+    
+  --[[
+  Input: {ref, pos, neg}, where ref, neg, pos are tensor 1 x (2*hpatch + 1) x width 
+  ]]--
+  
+  local Net = nn.Sequential()
+  local comNet = nn.ConcatTable()
+  Net:add(comNet); 
+  
+  local refPosNet = nn.Sequential()
+  local refNegNet = nn.Sequential()
+  local negPosNet = nn.Sequential()
+  
+  comNet:add(refPosNet)
+  comNet:add(refNegNet)
+  comNet:add(negPosNet)
+  
+  local refPosSelNet = nn.ConcatTable()  -- input selectors for each distance net
+  local refNegSelNet = nn.ConcatTable()
+  local negPosSelNet = nn.ConcatTable()
+ 
+  refPosNet:add(refPosSelNet)
+  refNegNet:add(refNegSelNet)
+  negPosNet:add(negPosSelNet)
+
+  refPosSelNet:add(nn.SelectTable(1))
+  refPosSelNet:add(nn.SelectTable(2))
+  
+  refNegSelNet:add(nn.SelectTable(1))
+  refNegSelNet:add(nn.SelectTable(3))
+  
+  negPosSelNet:add(nn.SelectTable(3))
+  negPosSelNet:add(nn.SelectTable(2))
+    
+  local refPosMetricNet = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max)  
+  local refNegMetricNet = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max)  
+  local negPosMetricNet = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max)  
+    
+  refPosNet:add(refPosMetricNet);
+  refNegNet:add(refNegMetricNet);
+  negPosNet:add(negPosMetricNet);
+  
+  Net:add(nn.mil(disp_max));
+  
+  local milFwdCst = nn.MarginRankingCriterion(loss_margin);
+  local milBwdCst = nn.MarginRankingCriterion(loss_margin);
+  local criterion = nn.ParallelCriterion():add(milFwdCst,1):add(milBwdCst,1)
+
+  return Net, criterion
+end  
+
+function trainerNet.getContrastive(disp_max, width, th_sup, loss_margin, embed_net, head_net)
+    
+    
+  local Net = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max)    
+  --local Net = metricNet:clone('weight','bias', 'gradWeight','gradBias')
+  
+  local comNet = nn.ConcatTable()
+  Net:add(comNet); 
+  
+  local refPos = nn.Sequential()
+  local posRef = nn.Sequential()
+  
+  comNet:add(refPos)
+  comNet:add(posRef)
+  
+  posRef:add(nn.Transpose({1, 2})) 
+  
+  --local posRefMetric = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max)  
+  --local refPosMetric = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max)  
+  
+  --posRef:add(posRefMetric);
+  --refPos:add(refPosMetric);
+  
+  posRef:add(nn.contrastive(th_sup, disp_max))  
+  refPos:add(nn.contrastive(th_sup, disp_max))  
+    
+  local contrastiveFwdCst = nn.MarginRankingCriterion(loss_margin);
+  local contrastiveBwdCst = nn.MarginRankingCriterion(loss_margin);  
+
+  local criterion = nn.ParallelCriterion():add(contrastiveFwdCst, 1):add(contrastiveBwdCst, 1)
+  
+  return Net, criterion
+end
+
+function trainerNet.getContrastiveDP(disp_max, width, th_sup, th_occ, loss_margin, embed_net, head_net)  
 
 
-local Net = metricNet:clone('weight','bias', 'gradWeight','gradBias')
---local Net = nn.Sequential()
+--local Net = metricNet:clone('weight','bias', 'gradWeight','gradBias')
+local Net = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max)  
 
--- pass ref and pos epipolar lines through feature net and normalize outputs
---Net:add(metricNet_)
-   
--- mask wrong disparities
-local mask = torch.ones(img_w-2*hpatch, img_w-2*hpatch)*2  
-mask = torch.triu(torch.tril(mask,-1),-disp_max)
-mask = mask - 2;
-Net:add(nn.addMatrix(mask))
-
--- clamp (-1, 1)
-Net:add(nn.Clamp(-1,1))
-
--- convert range to (0 1)
-Net:add(nn.AddConstant(1))
-Net:add(nn.MulConstant(0.5))
-
-Net:add(nn.contrastDprog(dist_min, occ_th))
+Net:add(nn.contrastiveDP(th_sup, th_occ))
 
 local contrastiveFwdCst = nn.MarginRankingCriterion(loss_margin);
 local contrastiveBwdCst = nn.MarginRankingCriterion(loss_margin);
