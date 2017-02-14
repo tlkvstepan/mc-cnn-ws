@@ -48,12 +48,10 @@ require 'libdprog'  -- C++ DP
 --
 dofile('CContrastive.lua');               
 dofile('CMil.lua');               
+dofile('CMilContrastive.lua');      
 
 dofile('CUnsupMB.lua')                     
 dofile('CUnsupKITTI.lua')
-
---dofile('copyElements.lua')
---dofile('CFixedIndex.lua')
 
 cnnMetric = dofile('CCNNMetric.lua');      
 testFun = dofile('CTestUtils.lua');         -- Function that performs test on validation set
@@ -70,8 +68,8 @@ cmd = torch.CmdLine()
 
 -- debug setting
 dbg = dbg or 'debug';
-method = method or 'mil'
-arch = arch or 'acrt-kitti'
+method = method or 'mil-contrastive'
+arch = arch or 'fst-kitti'
 set = set or 'kitti'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp')
@@ -260,6 +258,7 @@ feval = function(param)
         
       elseif method == 'mil-contrastive' then
     
+        tr_net, criterion =  trainerNet.getMilContrastive(_DISP_MAX_TAB_[nsample], _WIDTH_TAB_[nsample], opt['th_sup'],  opt['th_occ'], opt['loss_margin'], _EMBED_NET_, _HEAD_NET_)
         
       elseif( method == 'contrastive-dp' ) then
         

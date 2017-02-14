@@ -12,9 +12,12 @@
 local contrastiveDP, parent = torch.class('nn.contrastiveDP', 'nn.Module')
 
 function contrastiveDP:__init(th_sup, th_occ)
+   
    parent.__init(self)
+   
    self.th_sup = th_sup
-   self.th_occ = th_occ 
+   self.th_occ = th_occ
+   
    -- these vector store indices of for Dyn Prog solution and row-wise maximums
    self.cols = torch.Tensor()
    self.rows = torch.Tensor()

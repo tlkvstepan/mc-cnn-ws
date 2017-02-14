@@ -8,130 +8,117 @@
     Note that we contrast refPos with refNeg as well as refPos with negPos
 --]]
 
-local milContrastDprog, parent = torch.class('nn.milContrastDprog', 'nn.Module')
+local milContrastive, parent = torch.class('nn.milContrastive', 'nn.Module')
 
-function milContrastDprog:__init(distMin, occ_th)
+function milContrastive:__init(th_sup, th_occ, disp_max)
    parent.__init(self)
    
-   self.occTh = occ_th
-   self.distMin = distMin
+   self.th_sup = th_sup
+   self.th_occ = th_occ
+   self.disp_max = disp_max
    
-   --- ref-pos dprog match
-   self.cols = torch.Tensor() 
-   self.rows = torch.Tensor() 
+   self.I_maxInRow_refPos = torch.Tensor() 
+   self.I_maxInRow_refNeg = torch.Tensor() 
+
+   self.I_maxInCol_refPos = torch.Tensor() 
+   self.I_maxInCol_negPos = torch.Tensor() 
+
+   self.I_2maxInRow_refPos = torch.Tensor()
+   self.I_2maxInCol_refPos = torch.Tensor()
 
 end
 
-function milContrastDprog:updateOutput(input)
+function milContrastive:updateOutput(input)
   
   local E_refPos, E_refNeg, E_negPos = unpack(input)
+  local E_refPosFwd = E_refPos; 
+  local E_refPosBwd = E_refPos:clone();
+  
   local dim = E_refPos:size(1)
-  local gpu_on = E_refPos:type() == "torch.CudaTensor"
+  local outdim = dim - (1 + self.disp_max) + 1; 
+    
+  -- milfwd
+  local E_maxInRow_refPos, I_maxInRow_refPos = torch.max(E_refPos, 2)
+  local E_maxInRow_refNeg, I_maxInRow_refNeg = torch.max(E_refNeg, 2)
   
-  -- dprog (always on cpu)
-  self.path_refPos = self.path_refPos or E_refPos:float()     
-  self.path_refPos:zero()
-  self.E_refPos = self.E_refPos or E_refPos:float()
-  self.E_refPos:copy(E_refPos) -- copy input GPU to CPU if cuda mode
-  self.aE  = self.aE  or E_refPos:float()    
-  self.aS = self.aS or E_refPos:float()
-  self.traceBack  = self.traceBack  or E_refPos:float()
-  self.aE:zero()
-  self.aS:zero()
-  self.traceBack:zero()
-  dprog.compute(self.E_refPos, self.path_refPos, self.aE, self.aS, self.traceBack)
-
-  -- mask occluded (on GPU if avaliable)
-  self.pathNonOcc_refPos = self.pathNonOcc_refPos or E_refPos:clone() -- cuda if cuda mode
-  self.pathNonOcc_refPos:copy(self.path_refPos)
-  local mask = torch.repeatTensor(self.pathNonOcc_refPos:sum(2):gt(self.occTh), 1, dim)
-  mask:add(torch.repeatTensor(self.pathNonOcc_refPos:sum(1):gt(self.occTh), dim, 1))
-  self.pathNonOcc_refPos[mask] = 0;
-  local dprogE = E_refPos[self.pathNonOcc_refPos:byte()] -- this basically copy
+  -- milbwd
+  local E_maxInCol_refPos, I_maxInCol_refPos = torch.max(E_refPos, 1) 
+  local E_maxInCol_negPos, I_maxInCol_negPos = torch.max(E_negPos, 1) 
+   
+    
+  -- contrastive fwd-bwd
+  -- mask maximum and all neighbours of the max
+  for d = -self.th_sup, self.th_sup do
+    
+     -- fwd
+     local ind =  I_maxInRow_refPos + d
+     ind[ind:lt(1)] = 1
+     ind[ind:gt(dim)] = dim
+     E_refPosFwd = E_refPosFwd:scatter(2, ind, -1/0)
   
-  -- find nooccluded rows / cols 
-  local indices = self.pathNonOcc_refPos:float():nonzero() -- cuda not supported for this opperation
+     -- bwd 
+     ind =  I_maxInCol_refPos + d
+     ind[ind:lt(1)] = 1
+     ind[ind:gt(dim)] = dim
+     E_refPosBwd = E_refPosBwd:scatter(1, ind, -1/0)
   
-  -- if there are nonoccluded segments
-  if( indices:numel() > 0 ) then
-    
-    if( gpu_on ) then
-      
-      indices = indices:cuda()
-    
-    end
-    
-    self.rows = indices:select(2,1)
-    self.cols = indices:select(2,2)
-    
-    -- mask energy array
-    local E_refPos_masked = E_refPos -- cuda if cuda mode
-    local E_refPos_masked_vec = E_refPos_masked:view(dim*dim)
-    for dy = -self.distMin, self.distMin do
-      
-      local rowsMask = self.rows + dy;
-      rowsMask[rowsMask:gt(dim)] = dim;
-      rowsMask[rowsMask:lt(1)] = 1;
-      
-      for dx = -self.distMin,self.distMin do
-      
-        local colsMask = self.cols + dx;
-        colsMask[colsMask:gt(dim)] = dim;
-        colsMask[colsMask:lt(1)] = 1;
-        local idx = colsMask + (rowsMask-1)*dim
-        E_refPos_masked_vec:indexFill(1, idx, -1/0)
-     
-      end
-    end
-    
-    -- mil forward
-    self.maxInRefNegRowE, self.maxInRefNegRowI = E_refNeg:max(2)
-    self.maxInRefNegRowE = self.maxInRefNegRowE:index(1,self.rows):squeeze()
-    self.maxInRefNegRowI = self.maxInRefNegRowI:index(1,self.rows):squeeze()
-    
-    -- mil backward
-    self.maxInNegPosColE, self.maxInNegPosColI = E_negPos:max(1)
-    self.maxInNegPosColE = self.maxInNegPosColE:index(2,self.cols):squeeze()
-    self.maxInNegPosColI = self.maxInNegPosColI:index(2,self.cols):squeeze()
-    
-    --- contrast forward
-    self.max2InRowE, self.max2InRowI = E_refPos_masked:max(2)
-    self.max2InRowE = self.max2InRowE:index(1,self.rows):squeeze()
-    self.max2InRowI = self.max2InRowI:index(1,self.rows):squeeze()
-    
-    -- contrast backward
-    self.max2InColE, self.max2InColI = E_refPos_masked:max(1)
-    self.max2InColE = self.max2InColE:index(2,self.cols):squeeze()
-    self.max2InColI = self.max2InColI:index(2,self.cols):squeeze()
-    
-
-    self.output = {{dprogE, self.maxInRefNegRowE},  -- mil fwd 
-                   {dprogE, self.maxInNegPosColE},  -- mil bwd
-                   {dprogE, self.max2InRowE}, -- contrast fwd
-                   {dprogE, self.max2InColE}} -- contrast bwd
-    
-  else
-    
-    self.output = {}
-      
   end
-      
-  -- note:
-  -- 1. sometimes output is empty
-  -- 2. number of elements in fwd and bwd can be differenet 
+
+
+  E_maxInRow_refPos:view(E_maxInRow_refPos, dim)
+  E_maxInRow_refNeg:view(E_maxInRow_refNeg, dim)
+  I_maxInRow_refPos:view(I_maxInRow_refPos, dim)
+  I_maxInRow_refNeg:view(I_maxInRow_refNeg, dim)
+  --
+  E_maxInCol_refPos:view(E_maxInCol_refPos, dim)
+  E_maxInCol_negPos:view(E_maxInCol_negPos, dim)
+  I_maxInCol_refPos:view(I_maxInCol_refPos, dim)
+  I_maxInCol_negPos:view(I_maxInCol_negPos, dim)
   
-  return self.output
+  local E_2maxInRow_refPos, I_2maxInRow_refPos = torch.max(E_refPosFwd, 2)
+  local E_2maxInCol_refPos, I_2maxInCol_refPos = torch.max(E_refPosBwd, 1)
+  
+  E_2maxInRow_refPos:view(E_2maxInRow_refPos, dim)
+  I_2maxInRow_refPos:view(I_2maxInRow_refPos, dim)
+  --
+  E_2maxInCol_refPos:view(E_2maxInCol_refPos, dim)
+  I_2maxInCol_refPos:view(I_2maxInCol_refPos, dim)
     
+  -- cut top disp_max rows
+  E_maxInRow_refPos = E_maxInRow_refPos[{{1+self.disp_max, dim}}]
+  E_maxInRow_refNeg = E_maxInRow_refNeg[{{1+self.disp_max, dim}}]
+  E_2maxInRow_refPos = E_2maxInRow_refPos[{{1+self.disp_max, dim}}]
+  --
+  self.I_maxInRow_refPos = I_maxInRow_refPos[{{1+self.disp_max, dim}}]:cuda() 
+  self.I_maxInRow_refNeg = I_maxInRow_refNeg[{{1+self.disp_max, dim}}]:cuda()
+  self.I_2maxInRow_refPos = I_2maxInRow_refPos[{{1+self.disp_max, dim}}]:cuda()
+   
+  -- cut last disp_max cols
+  E_maxInCol_refPos = E_maxInCol_refPos[{{1, dim-self.disp_max}}] 
+  E_maxInCol_negPos = E_maxInCol_negPos[{{1, dim-self.disp_max}}]
+  E_2maxInCol_refPos = E_2maxInCol_refPos[{{1, dim-self.disp_max}}]
+  --
+  self.I_maxInCol_refPos = I_maxInCol_refPos[{{1, dim-self.disp_max}}]:cuda()
+  self.I_maxInCol_negPos = I_maxInCol_negPos[{{1, dim-self.disp_max}}]:cuda()
+  self.I_2maxInCol_refPos= I_2maxInCol_refPos[{{1, dim-self.disp_max}}]:cuda() 
+  
+  self.output = {{E_maxInRow_refPos, E_maxInRow_refNeg},  -- mil fwd 
+                 {E_maxInCol_refPos, E_maxInCol_negPos},  -- mil bwd, every tensor is width-disp_max-hpatch*2
+                 {E_maxInRow_refPos, E_2maxInRow_refPos}, -- fwdContrastive
+                 {E_maxInCol_refPos, E_2maxInCol_refPos}} -- bwdContrastive
+                   
+  return self.output 
+  
 end
 
-function milContrastDprog:updateGradInput(input, gradOutput)
+function milContrastive:updateGradInput(input, gradOutput)
    
   local fwdMil, bwdMil, fwdContrast, bwdContrast = unpack(gradOutput)
  
-  local ogradDprogE1, ogradMaxInRefNegRowE = unpack(fwdMil)
-  local ogradDprogE2, ogradMaxInNegPosColE = unpack(bwdMil)
-  local ogradDprogE3, ogradMax2InRowE = unpack(fwdContrast)
-  local ogradDprogE4, ogradMax2InColE = unpack(bwdContrast)  
+  local ograd_maxInRow_refPos1, ograd_maxInRow_refNeg = unpack(fwdMil)
+  local ograd_maxInCol_refPos1, ograd_maxInCol_negPos = unpack(bwdMil)
+  local ograd_maxInRow_refPos2, ograd_2maxInRow_refPos =  unpack(fwdContrast)
+  local ograd_maxInCol_refPos2, ograd_2maxInCol_refPos =  unpack(fwdContrast)
   
   local E_refPos, E_refNeg, E_negPos = unpack(input)
   local dim = E_refPos:size(1) 
@@ -148,27 +135,32 @@ function milContrastDprog:updateGradInput(input, gradOutput)
   local igradNegPos_vec = self.igradNegPos:view(dim*dim) 
   local idx;
   
-  idx = (self.cols) + (self.rows-1)*dim;
-  igradRefPos_vec:indexAdd(1, idx, ogradDprogE1)
-  igradRefPos_vec:indexAdd(1, idx, ogradDprogE2)
-  igradRefPos_vec:indexAdd(1, idx, ogradDprogE3)
-  igradRefPos_vec:indexAdd(1, idx, ogradDprogE4)
+  local row = torch.range(1+self.disp_max, dim):cuda()
+  local col = torch.range(1, dim - self.disp_max):cuda()
+    
+  idx = (self.I_maxInRow_refPos) + (row-1)*dim;
+  igradRefPos_vec:indexAdd(1, idx, ograd_maxInRow_refPos1)
+  igradRefPos_vec:indexAdd(1, idx, ograd_maxInRow_refPos2)
   
+  idx = col + (self.I_maxInCol_refPos-1)*dim;
+  igradRefPos_vec:indexAdd(1, idx, ograd_maxInCol_refPos1)
+  igradRefPos_vec:indexAdd(1, idx, ograd_maxInCol_refPos2)
+    
   -- mil fwd
-  idx = (self.maxInRefNegRowI) + (self.rows-1)*dim;
-  igradRegNeg_vec:indexAdd(1, idx, ogradMaxInRefNegRowE)
+  idx = (self.I_maxInRow_refNeg) + (row-1)*dim;
+  igradRegNeg_vec:indexAdd(1, idx, ograd_maxInRow_refNeg)
   
   -- mil bwd
-  idx = (self.cols) + (self.maxInNegPosColI-1)*dim;
-  igradNegPos_vec:indexAdd(1, idx, ogradMaxInNegPosColE)
+  idx = (col) + (self.I_maxInCol_negPos-1)*dim;
+  igradNegPos_vec:indexAdd(1, idx, ograd_maxInCol_negPos)
   
   -- contrast fwd
-  idx = (self.max2InRowI) + (self.rows-1)*dim;
-  igradRefPos_vec:indexAdd(1, idx, ogradMax2InRowE)
+  idx = (self.I_2maxInRow_refPos) + (row-1)*dim;
+  igradRefPos_vec:indexAdd(1, idx, ograd_2maxInRow_refPos)
     
   -- contrast bwd  
-  idx = (self.cols) + (self.max2InColI-1)*dim;
-  igradRefPos_vec:indexAdd(1, idx, ogradMax2InColE)
+  idx = (col) + (self.I_2maxInCol_refPos-1)*dim;
+  igradRefPos_vec:indexAdd(1, idx, ograd_2maxInCol_refPos)
   
   self.gradInput = {self.igradRefPos, self.igradRefNeg, self.igradNegPos}
    
