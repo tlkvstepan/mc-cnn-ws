@@ -1,14 +1,11 @@
 
-result_batch = dlmread('batch_learning.log', ' ', 1, 1)
-result_doubleBatch = dlmread('doubleBatch_learning.log', ' ', 1, 1)
+result_batch = dlmread('/HDD1/Dropbox/Research/01_code/mil-mc-cnn/work/TRAIN_MIL_ACRT_KITTI_KITTI_EXT/err_TRAIN_MIL_ACRT_KITTI_KITTI_EXT_2017_02_13_18:42:24.txt')
 
 yyaxis left
-plot(result_batch(:,1)); hold on
-plot(result_doubleBatch(:,1)); hold on
-ylabel('Train error: max(0, -x^{(+)}+x^{(-)}+\mu)')
+plot(result_batch(:,3)); hold on
+ylabel('Train loss: max(0, -x^{(+)}+x^{(-)}+\mu)')
 yyaxis right
-plot(result_batch(:,2)); hold on
-plot(result_doubleBatch(:,2));
-ylabel('Test accuracy: N(x^{(+)}>x^{(-)})/N')
-xlabel('epoch# (256x5 epipolar lines each)')
-legend({'batch', 'doubleBatch'})
+plot(result_batch(:,4)); hold on
+ylabel('Test error: N(x^{(+)}>x^{(-)})/N')
+xlabel('epoch# (370x100 epipolar lines each)')
+legend({'MIL-ACRT-ARCH-KITTI'})

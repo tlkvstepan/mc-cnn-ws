@@ -100,8 +100,6 @@ cmd:option('-th_occ', 1)
 if dbg == 'debug' then
   local timestamp = os.date("test-%Y_%m_%d_%X")
   cmd:option('-debug_fname', timestamp)
-else
-  cmd:option('-debug_fname', 'test-34776')
 end
 cmd:option('-debug_start_from_net', '')
 
@@ -317,25 +315,114 @@ feval = function(param)
   return _TR_LOSS_, grad
 end
 
--- go through epoches
+-- initialize the parameters
 if arch == 'fst-kitti' or arch == 'fst-mb' then
   cur_param = _EMBED_PARAM_:clone();
 else
   cur_param = torch.cat(_EMBED_PARAM_, _HEAD_PARAM_, 1)
 end
 
+
+local train_loss = 1/0;      
+local time_per_batch = 1/0;   
+
 for nepoch = 1, opt['train_nb_epoch'] do
 
-  local sample_loss= {}
   local start_time = os.time()
+  local timestamp = os.date("%Y_%m_%d_%X_")
   
+  -- compute validation error
+  local valid_err 
+  do 
+ 
+    local net_fname = 'tmp/' ..timestamp.. '.t7';
+ 
+    -- save current network 
+    local network = {};
+    network[1] = _EMBED_NET_
+    network[2] = _HEAD_NET_
+    torch.save(net_fname, network, 'ascii');
+  
+    local set_name
+    if( set == 'kitti2015_ext' ) then
+      set_name = 'kitti2015'
+    elseif ( set == 'kitti_ext' ) then
+      set_name = 'kitti';
+    else
+      set_name = set
+    end
+    
+    local exec_str 
+    if arch == 'fst-mb' or arch == 'fst-kitti' then 
+      exec_str = './main.lua ' .. set_name .. ' our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
+    else
+      -- since accurate architecture is very slow, we compute validation error only using several images
+      exec_str = './main.lua ' .. set_name .. ' our -a test_te -small_test 1 -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
+    end
+ 
+    lfs.chdir('../mc-cnn')      -- switch current directory
+    local handle = io.popen(exec_str)
+    local result = handle:read("*a")
+    local valid_err_str = string.gsub(result,'\n','');
+    valid_err = tonumber(valid_err_str);
+    lfs.chdir('../mil-mc-cnn')  
+      
+  end
+    
+  -- push new record to log
+  local trainingLog = {}
+  trainingLog['train_loss'] = train_loss
+  trainingLog['valid_err']  = valid_err
+  trainingLog['dt']         = time_per_batch
+  table.insert(_TRAIN_LOG_, trainingLog)
+  
+  -- save network 
+  do
+    local network = {}
+    network[1] = _EMBED_NET_
+    network[2] = _HEAD_NET_
+    local optim_state = {}
+    if nepoch > 1 then
+      optim_state.t = _OPTIM_STATE_.t;
+      optim_state.m = _OPTIM_STATE_.m:double();
+      optim_state.v = _OPTIM_STATE_.v:double();
+      optim_state.denom = _OPTIM_STATE_.denom:double();  
+    end
+    network[3] = optim_state
+    network[4] = _TRAIN_LOG_
+    
+    local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. timestamp.. '.t7'; -- history log 
+    torch.save(net_fname, tmp, 'ascii');
+    
+    local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. '.t7';             -- current state log
+    torch.save(net_fname, tmp, 'ascii');
+  end
+    
+  -- save log
+  local time
+  do
+    local log_fname = 'work/' .. opt['debug_fname'] .. '/err_' .. opt['debug_fname'] ..'_'.. timestampBeg.. '.txt';
+    local f = io.open(log_fname, 'w')
+    f:write(string.format("%d, %f, %f, %f\n", 1, 0, 1/0, _TRAIN_LOG_[1].valid_err))
+    time = 0
+    for i = 2, #_TRAIN_LOG_ do
+      time  = time  + _TRAIN_LOG_[i].dt
+      f:write(string.format("%d, %f, %f, %f\n", i, time, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].valid_err))
+    end
+    f:close()
+  end
+  
+  -- print log
+  print(string.format("epoch %d, time = %f, train_loss = %f, valid_err = %f\n", nepoch, time, _TRAIN_LOG_[#_TRAIN_LOG_].train_loss, _TRAIN_LOG_[#_TRAIN_LOG_].valid_err))
+    
   -- go through batches
+  batch_loss = {}
   for nbatch = 1, opt['train_nb_batch'] do
     
    -- get batch
    _TR_INPUT_, _WIDTH_TAB_, _DISP_MAX_TAB_ = unsupSet:get(opt['train_batch_size'])   
            
-   -- some network need only two epopolar lines
+   -- some network we need only two epopolar lines
    if method == 'contrastive' or method == 'contrastive-dp' then
       _TR_INPUT_[3] = nil
    end
@@ -358,86 +445,19 @@ for nepoch = 1, opt['train_nb_epoch'] do
     _HEAD_PARAM_:copy(cur_param[{{1+_EMBED_PARAM_:size(1), cur_param:size(1)}}])
   end
   
-   table.insert(sample_loss, _TR_LOSS_)
+   table.insert(batch_loss, _TR_LOSS_)
    
    collectgarbage()
    
   end
-
-  local end_time = os.time()
-  local time_diff = os.difftime(end_time,start_time);
-  local timestamp = os.date("%Y_%m_%d_%X_")
     
-  -- compute trainin loss for batch
-  local train_loss = torch.Tensor(sample_loss):mean();
+  -- compute time
+  local end_time = os.time()
+  time_per_batch = os.difftime(end_time, start_time);
   
-  -- run for validation subset and get :error
-  local net_fname = 'tmp/' ..timestamp.. '.t7';
+  -- compute trainin loss for epoch
+  train_loss = torch.Tensor(batch_loss):mean();
   
-  local set_name
-  if( set == 'kitti2015_ext' ) then
-    set_name = 'kitti2015'
-  elseif ( set == 'kitti_ext' ) then
-    set_name = 'kitti';
-  else
-    set_name = set
-  end
-  
-  local str 
-  if arch == 'fst-mb' or arch == 'fst-kitti' then 
-    str = './main.lua ' .. set_name .. ' our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
-  else
-    str = './main.lua ' .. set_name .. ' our -a test_te -small_test 1 -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
-  end
-  tmp = {};
-  tmp[1] = _EMBED_NET_
-  tmp[2] = _HEAD_NET_
-  torch.save(net_fname, tmp, 'ascii');
-  lfs.chdir('../mc-cnn')
-  local handle = io.popen(str)
-  local result = handle:read("*a")
-  str_err = string.gsub(result,'\n','');
-  valid_err = tonumber(str_err);
-  lfs.chdir('../mil-mc-cnn')
-
-  -- push new record to log
-  local logRecord = {}
-  logRecord['train_loss'] = train_loss
-  logRecord['valid_err'] = valid_err
-  logRecord['dt'] = time_diff
-  table.insert(_TRAIN_LOG_, logRecord)
-  
-  -- save network
-  local tmp = {}
-  tmp[1] = _EMBED_NET_
-  tmp[2] = _HEAD_NET_
-  local optim_state = {}
-  optim_state.t = _OPTIM_STATE_.t;
-  optim_state.m = _OPTIM_STATE_.m:double();
-  optim_state.v = _OPTIM_STATE_.v:double();
-  optim_state.denom = _OPTIM_STATE_.denom:double();  
-  tmp[3] = optim_state
-  tmp[4] = _TRAIN_LOG_
-  local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. timestamp.. '.t7';
-  torch.save(net_fname, tmp, 'ascii');
-  local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. '.t7';
-  torch.save(net_fname, tmp, 'ascii');
-
-  -- save log
-  local log_fname = 'work/' .. opt['debug_fname'] .. '/err_' .. opt['debug_fname'] ..'_'.. timestampBeg.. '.txt';
-  local f = io.open(log_fname, 'w')
-  local time = 0
-  for i = 1, #_TRAIN_LOG_ do
-    time  = time  + _TRAIN_LOG_[i].dt
-    f:write(string.format("%d, %f, %f, %f\n", i, time, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].valid_err))
-  end
-  f:close()
-  
-  -- print log
-  print(string.format("epoch %d, time = %i, train_loss = %f, valid_err = %f\n", nepoch, time, _TRAIN_LOG_[#_TRAIN_LOG_].train_loss, _TRAIN_LOG_[#_TRAIN_LOG_].valid_err))
-  
-collectgarbage()
-
 end
 
 
