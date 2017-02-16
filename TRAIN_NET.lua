@@ -68,12 +68,12 @@ cmd = torch.CmdLine()
 
 -- debug setting
 dbg = dbg or 'debug';
-method = method or 'contrastive'
-arch = arch or 'acrt-kitti'
+method = method or 'mil-contrastive'
+arch = arch or 'xxl'
 set = set or 'kitti'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp')
-assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti')
+assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'xxl')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
 if dbg == 'normal' then
