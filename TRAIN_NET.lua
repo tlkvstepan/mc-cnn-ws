@@ -86,7 +86,7 @@ elseif dbg == 'tune' then
   cmd:option('-train_nb_batch', 100)        
   cmd:option('-train_nb_epoch', 5)        
 else 
-  cmd:option('-train_batch_size', 128)     
+  cmd:option('-train_batch_size', 512)     
   cmd:option('-train_nb_batch', 1)        
   cmd:option('-train_nb_epoch', 10)        
 end
