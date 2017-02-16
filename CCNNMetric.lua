@@ -392,32 +392,15 @@ function cnnMetric.cosHead(nbFeatureMap)
   
   local cosNet = nn.Sequential()
   local normNet = nn.ParallelTable()
+ 
   cosNet:add(normNet)
+  normNet:add(nn.Normalize(2))
+  normNet:add(nn.Normalize(2))
+  cosNet:add(nn.DotProduct())
   
-  local net1 = nn.Sequential()
-  local net2 = nn.Sequential()
-  
-  normNet:add(net1)
-  normNet:add(net2)
-  
-  net1:add(nn.Normalize(2))
-  net2:add(nn.Normalize(2))
-  
-  net1:add(nn.Unsqueeze(2))
-    net2:add(nn.Unsqueeze(2))
-  
-  cosNet:add(nn.MM(false, true))
-  cosNet:add(nn.Squeeze())
-    
-  --cosNet:add(normNet)
-  --normNet:add(nn.Normalize(2))
-  --normNet:add(nn.Normalize(2))
-  --cosNet:add(nn.DotProduct())
-  
-    
   -- convert range to (0 1)
-  --cosNet:add(nn.AddConstant(1))
-  --cosNet:add(nn.MulConstant(0.5))
+  cosNet:add(nn.AddConstant(1))
+  cosNet:add(nn.MulConstant(0.5))
       
   return cosNet
   
