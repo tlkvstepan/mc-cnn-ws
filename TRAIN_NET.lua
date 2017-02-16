@@ -68,12 +68,12 @@ cmd = torch.CmdLine()
 
 -- debug setting
 dbg = dbg or 'debug';
-method = method or 'contrastive'
-arch = arch or 'acrt-kitti'
+method = method or 'mil'
+arch = arch or 'fst-xxl'
 set = set or 'kitti'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp')
-assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti')
+assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
 if dbg == 'normal' then
@@ -218,7 +218,7 @@ end
 feval = function(param)
   
   -- set network parameters
-  if arch == 'fst-kitti' or arch == 'fst-mb' then
+  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' then
     _EMBED_PARAM_:copy(param)
   else
     _EMBED_PARAM_:copy(param[{{1, _EMBED_PARAM_:size(1)}}])
@@ -308,7 +308,7 @@ feval = function(param)
   
   _EMBED_GRAD_:div(nb_comp_ttl);
   
-  if arch == 'fst-kitti' or arch == 'fst-mb' then
+  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl'  then
     grad = _EMBED_GRAD_:clone()
   else 
     _HEAD_GRAD_:div(nb_comp_ttl);
@@ -319,7 +319,7 @@ feval = function(param)
 end
 
 -- initialize the parameters
-if arch == 'fst-kitti' or arch == 'fst-mb' then
+if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' then
   cur_param = _EMBED_PARAM_:clone();
 else
   cur_param = torch.cat(_EMBED_PARAM_, _HEAD_PARAM_, 1)
@@ -356,7 +356,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
     end
     
     local exec_str 
-    if arch == 'fst-mb' or arch == 'fst-kitti' then 
+    if arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-xxl' then 
       exec_str = './main.lua ' .. set_name .. ' our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
     else
       -- since accurate architecture is very slow, we compute validation error only using several images
@@ -441,7 +441,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
    optim.adam(feval, cur_param, {}, _OPTIM_STATE_)    
    
    -- update parameters
-  if arch == 'fst-kitti' or arch == 'fst-mb' then
+  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' then
     _EMBED_PARAM_:copy(cur_param)
   else
     _EMBED_PARAM_:copy(cur_param[{{1, _EMBED_PARAM_:size(1)}}])
