@@ -68,8 +68,8 @@ cmd = torch.CmdLine()
 
 -- debug setting
 dbg = dbg or 'debug';
-method = method or 'mil-contrastive'
-arch = arch or 'fst-kitti'
+method = method or 'contrastive'
+arch = arch or 'acrt-kitti'
 set = set or 'kitti'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp')
@@ -100,7 +100,10 @@ cmd:option('-th_occ', 1)
 if dbg == 'debug' then
   local timestamp = os.date("test-%Y_%m_%d_%X")
   cmd:option('-debug_fname', timestamp)
+else
+  cmd:option('-debug_fname', 'experiments')
 end
+
 cmd:option('-debug_start_from_net', '')
 
 opt = cmd:parse(arg)

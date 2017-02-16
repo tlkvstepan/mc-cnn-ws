@@ -58,12 +58,12 @@ function headNetMulti:updateGradInput(input, gradOutput)
   local dim = gradOutput:size(1)
     
   -- after we receive output gradients (which are sparse!) we know what pairs are useful
-  local useful_arr_idx = gradOutput:nonzero():cuda()
+  local useful_arr_idx = gradOutput:double():nonzero():cuda() -- for server compatibility
   if( useful_arr_idx:numel() > 0 ) then    
   do 
     local flat_idx = useful_arr_idx:select(2,2) + (useful_arr_idx:select(2,1) - 1)*dim
     local gradOutput_vec = gradOutput:view(dim*dim)
-    self.useful_gradOutput = gradOutput_vec:index(1, flat_idx:cudaLong())
+    self.useful_gradOutput = gradOutput_vec:index(1, flat_idx:long()):cuda() -- for server compatibility
   end
 
   -- selector nets select usefull elements for cost computation
