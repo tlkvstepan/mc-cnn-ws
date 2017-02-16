@@ -356,7 +356,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
     end
     
     local exec_str 
-    if arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-xxl' then 
+    if arch == 'fst-mb' or arch == 'fst-kitti' then 
       exec_str = './main.lua ' .. set_name .. ' our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
     else
       -- since accurate architecture is very slow, we compute validation error only using several images
@@ -395,10 +395,10 @@ for nepoch = 1, opt['train_nb_epoch'] do
     network[4] = _TRAIN_LOG_
     
     local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. timestamp.. '.t7'; -- history log 
-    torch.save(net_fname, tmp, 'ascii');
+    torch.save(net_fname, network, 'ascii');
     
     local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. '.t7';             -- current state log
-    torch.save(net_fname, tmp, 'ascii');
+    torch.save(net_fname, network, 'ascii');
   end
     
   -- save log

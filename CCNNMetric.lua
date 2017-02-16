@@ -43,8 +43,8 @@ function cnnMetric.getEmbeddNet(metricName)
   
   elseif( metricName == 'fst-xxl' ) then
   
-    nbConvLayers = 12  
-    nbFeatureMap = 112
+    nbConvLayers = 10  
+    nbFeatureMap = 64
     kernel = 3
   
   end
