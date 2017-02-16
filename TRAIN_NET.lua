@@ -356,7 +356,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
     end
     
     local exec_str 
-    if arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-xxl' then 
+    if arch == 'fst-mb' or arch == 'fst-kitti' then 
       exec_str = './main.lua ' .. set_name .. ' our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
     else
       -- since accurate architecture is very slow, we compute validation error only using several images
