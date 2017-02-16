@@ -28,8 +28,9 @@ width = 100;
 arch = 'fst-kitti'
 loss_margin = 0.2
 
-embed_net = cnnMetric.getEmbeddNet(arch)
-head_net  = cnnMetric.getHeadNet(arch)
+--embed_net = cnnMetric.getEmbeddNet(arch)
+--head_net  = cnnMetric.getHeadNet(arch)
+head_net = cnnMetric.cosHead(10);
 head_net:cuda()
 
 ref = torch.randn(100, 10):cuda() 
