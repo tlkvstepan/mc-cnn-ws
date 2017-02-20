@@ -403,20 +403,41 @@ for nepoch = 1, opt['train_nb_epoch'] do
     
   -- save log
   local time
+  local log_fname 
   do
-    local log_fname = 'work/' .. opt['debug_fname'] .. '/err_' .. opt['debug_fname'] ..'_'.. timestampBeg.. '.txt';
+    log_fname = 'work/' .. opt['debug_fname'] .. '/err_' .. opt['debug_fname'] ..'_'.. timestampBeg.. '.txt';
     local f = io.open(log_fname, 'w')
     f:write(string.format("%d, %f, %f, %f\n", 1, 0, 1/0, _TRAIN_LOG_[1].valid_err))
     time = 0
-    for i = 2, #_TRAIN_LOG_ do
-      time  = time  + _TRAIN_LOG_[i].dt
-      f:write(string.format("%d, %f, %f, %f\n", i, time, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].valid_err))
+    for i = 1, #_TRAIN_LOG_ do
+      if _TRAIN_LOG_[i].dt ~= 1/0 then -- it is initial iteration than skip it
+        time  = time  + _TRAIN_LOG_[i].dt
+        f:write(string.format("%d, %f, %f, %f\n", i, time, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].valid_err))
+        f:write(string.format("%d, %f, %f, %f\n", i, time, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].valid_err))
+      end
     end
     f:close()
   end
   
   -- print log
   print(string.format("epoch %d, time = %f, train_loss = %f, valid_err = %f\n", nepoch, time, _TRAIN_LOG_[#_TRAIN_LOG_].train_loss, _TRAIN_LOG_[#_TRAIN_LOG_].valid_err))
+    
+  -- save current training plot 
+  -- two graphs, one for training (blue) and one for test (red)
+  gnuplot.epsfigure('work/' .. opt['debug_fname'] .. '/plot_' .. opt['debug_fname'] .. '.eps')
+  file = 'err_TRAIN_CONTRASTIVEDP_FSTXXL_KITTIEXT_2017_02_18_18:56:22.txt'
+  gnuplot.raw('set ylabel "train loss"')
+  gnuplot.raw('set y2label "valid. err, [%]"')
+  gnuplot.raw('set xlabel "iter"')
+  gnuplot.raw('set x1tic auto')
+  gnuplot.raw('set y1tic auto')
+  gnuplot.raw('set y2tic auto')
+  gnuplot.raw('set logscale x')
+  gnuplot.raw('set logscale y')
+  gnuplot.raw('set logscale y2')
+  gnuplot.raw("plot '" .. log_fname .. "' using ($1):(($4))  title 'valid. err' axes x1y2, '"
+                     .. log_fname .. "' using ($1):(($3))  title 'train. loss' axes x1y1")
+  gnuplot.plotflush()
     
   -- go through batches
   batch_loss = {}
