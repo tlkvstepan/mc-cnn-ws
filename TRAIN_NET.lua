@@ -139,7 +139,7 @@ if( opt.debug_start_from_net ~= '' ) then
     local tmp = torch.load(opt.debug_start_from_net, 'ascii')      
     _EMBED_NET_ = tmp[1]
     _HEAD_NET_  = tmp[2]
-    _OPTIM_STATE_ = tmp[3]
+   -- _OPTIM_STATE_ = tmp[3]
     _TRAIN_LOG_  = tmp[4]
     print('Continue training from network specified by user\n')
   else
@@ -151,7 +151,7 @@ else
     local tmp = torch.load(default_net, 'ascii')      
     _EMBED_NET_ = tmp[1]
     _HEAD_NET_  = tmp[2]
-    _OPTIM_STATE_ = tmp[3]
+    --_OPTIM_STATE_ = tmp[3]
     _TRAIN_LOG_ = tmp[4]
     print('Continue training from default network\n')
   else
