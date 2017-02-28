@@ -322,10 +322,10 @@ function cnnMetric.isParametric(net)
 end
 
 
-function cnnMetric.getHPatch(embeddNet)
+function cnnMetric.getHPatch(net)
    local ws = 1
-   for i = 1,#embeddNet.modules do
-      local module = embeddNet:get(i)
+   for i = 1,#net.modules do
+      local module = net:get(i)
       if torch.typename(module) == 'cudnn.SpatialConvolution' or 
          torch.typename(module) == 'nn.SpatialConvolution' or
          torch.typename(module) == 'cunn.SpatialConvolution' then

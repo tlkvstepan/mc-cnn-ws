@@ -32,6 +32,7 @@ require 'nn'
 require 'image'
 require 'torch'
 require 'lfs'
+require 'os'
 
 -- cuda 
 require 'cunn'
@@ -49,9 +50,11 @@ require 'libdprog'  -- C++ DP
 dofile('CContrastive.lua');               
 dofile('CMil.lua');               
 dofile('CMilContrastive.lua');      
+dofile('CPipeline.lua');
 
 dofile('CUnsupMB.lua')                     
 dofile('CUnsupKITTI.lua')
+dofile('CUnsupPipeKITTI.lua')
 
 cnnMetric = dofile('CCNNMetric.lua');      
 testFun = dofile('CTestUtils.lua');         -- Function that performs test on validation set
@@ -68,11 +71,11 @@ cmd = torch.CmdLine()
 
 -- debug setting
 dbg = dbg or 'debug';
-method = method or 'mil'
+method = method or 'pipeline'
 arch = arch or 'fst-xxl'
 set = set or 'kitti'
 
-assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp')
+assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
 assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
@@ -86,7 +89,7 @@ elseif dbg == 'tune' then
   cmd:option('-train_nb_batch', 100)        
   cmd:option('-train_nb_epoch', 5)        
 else 
-  cmd:option('-train_batch_size', 512)     
+  cmd:option('-train_batch_size', 150)     
   cmd:option('-train_nb_batch', 1)        
   cmd:option('-train_nb_epoch', 10)        
 end
@@ -136,7 +139,7 @@ if( opt.debug_start_from_net ~= '' ) then
     local tmp = torch.load(opt.debug_start_from_net, 'ascii')      
     _EMBED_NET_ = tmp[1]
     _HEAD_NET_  = tmp[2]
-    _OPTIM_STATE_ = tmp[3]
+   -- _OPTIM_STATE_ = tmp[3]
     _TRAIN_LOG_  = tmp[4]
     print('Continue training from network specified by user\n')
   else
@@ -148,7 +151,7 @@ else
     local tmp = torch.load(default_net, 'ascii')      
     _EMBED_NET_ = tmp[1]
     _HEAD_NET_  = tmp[2]
-    _OPTIM_STATE_ = tmp[3]
+    --_OPTIM_STATE_ = tmp[3]
     _TRAIN_LOG_ = tmp[4]
     print('Continue training from default network\n')
   else
@@ -175,41 +178,65 @@ _HEAD_PARAM_, _HEAD_GRAD_   = _HEAD_NET_:getParameters()
 ---------------------------- initialize dataset
 
 if set == 'kitti_ext' or set == 'kitti' then
-
-  unsupSet = unsupKITTI('data/kitti_ext', set, hpatch);
+  
+  if method == 'pipeline' then
+    
+    unsupSet = unsupPipeKITTI('data/kitti_ext', set, hpatch);
+  
+  else
+  
+    unsupSet = unsupKITTI('data/kitti_ext', set, hpatch);
+  
+  end
   
 elseif set == 'kitti2015' or set == 'kitti2015_ext' then
   
-  unsupSet = unsupKITTI('data/kitti15_ext', set, hpatch);
+  if method == 'pipeline' then  
+  
+    unsupSet = unsupPipeKITTI('data/kitti15_ext', set, hpatch);
+  
+  else
+    
+    unsupSet = unsupKITTI('data/kitti15_ext', set, hpatch);
+  
+  end
 
 elseif set == 'mb' then
   
-  local metadata_fname = 'data/mb/meta.bin'
-  local metadata = utils.fromfile(metadata_fname)
-  local img_tab = {}
-  local disp_tab = {}
-  for n = 1,metadata:size(1) do
-    local img_light_tab = {}
-    light = 1
-    while true do
-      fname = ('data/mb/x_%d_%d.bin'):format(n, light)
-      if not paths.filep(fname) then
-        break
-      end
-      table.insert(img_light_tab, utils.fromfile(fname))
-      light = light + 1
-    end
-    table.insert(img_tab, img_light_tab)
-    fname = ('data/mb/dispnoc%d.bin'):format(n)
-    if paths.filep(fname) then
-      table.insert(disp_tab, utils.fromfile(fname))
-    end
-    if metadata[{n,3}] == -1 then -- fill max_disp for train set
-      metadata[{n,3}] = disp_tab[n]:max()
-    end
-  end
+  if method == 'pipeline' then
     
-  unsupSet = unsupMB(img_tab, metadata, hpatch)
+    error('training with pipeline for mb is not yet implemented')
+  
+  else
+    
+    local metadata_fname = 'data/mb/meta.bin'
+    local metadata = utils.fromfile(metadata_fname)
+    local img_tab = {}
+    local disp_tab = {}
+    for n = 1,metadata:size(1) do
+      local img_light_tab = {}
+      light = 1
+      while true do
+        fname = ('data/mb/x_%d_%d.bin'):format(n, light)
+        if not paths.filep(fname) then
+          break
+        end
+        table.insert(img_light_tab, utils.fromfile(fname))
+        light = light + 1
+      end
+      table.insert(img_tab, img_light_tab)
+      fname = ('data/mb/dispnoc%d.bin'):format(n)
+      if paths.filep(fname) then
+        table.insert(disp_tab, utils.fromfile(fname))
+      end
+      if metadata[{n,3}] == -1 then -- fill max_disp for train set
+        metadata[{n,3}] = disp_tab[n]:max()
+      end
+    end
+    
+    unsupSet = unsupMB(img_tab, metadata, hpatch)
+  
+  end
   
 end
 
@@ -226,7 +253,8 @@ feval = function(param)
   end
   
   local batch_size = #_TR_INPUT_[1];
-  local epiRef, epiPos, epiNeg = unpack(_TR_INPUT_) -- epiNeg does not exist for  contrastive-max and contrastive-dprog
+  --local epi, match = unpack(_TR_INPUT_) -- epiNeg does not exist for  contrastive-max and contrastive-dprog
+  --local epiRef, epiPos, epiNeg = unpack(epi) -- epiNeg does not exist for  contrastive-max and contrastive-dprog
   
   _TR_LOSS_ = 0;   
   
@@ -238,17 +266,33 @@ feval = function(param)
   local criterion, tr_net
   
   for nsample = 1, batch_size do
+    
+   -- print(nsample)
+    
+   -- if nsample == 51 then
+   --   i = 1;
+   -- end
   
     local sample_input = {}
-    sample_input[1] = epiRef[nsample]
-    sample_input[2] = epiPos[nsample]
-    if epiNeg ~= nil then
-      sample_input[3] = epiNeg[nsample]
+   
+    if ( method == 'pipeline' ) then 
+      sample_input[1] = {}
+      sample_input[1][1] = _TR_INPUT_[1][nsample]
+      sample_input[1][2] = _TR_INPUT_[2][nsample]
+      sample_input[2] = _TR_INPUT_[3][nsample]
+    else
+      sample_input[1] = _TR_INPUT_[1][nsample]
+      sample_input[2] = _TR_INPUT_[2][nsample]
+      if _TR_INPUT_[3][nsample] ~= nil then
+        sample_input[3] = _TR_INPUT_[3][nsample]
+      end
     end
+     -- if epiNeg ~= nil then
+   --   sample_input[3] = epiNeg[nsample]
+   -- end
     
     if( _WIDTH_TAB_[nsample] ~= _WIDTH_TAB_[nsample-1] or _DISP_MAX_TAB_[nsample] ~= _DISP_MAX_TAB_[nsample-1] )  then
-    
-     
+         
       if method == 'mil' then
       
         tr_net, criterion = trainerNet.getMil(_DISP_MAX_TAB_[nsample], _WIDTH_TAB_[nsample], opt['loss_margin'], _EMBED_NET_, _HEAD_NET_)  
@@ -265,6 +309,10 @@ feval = function(param)
         
         tr_net, criterion =  trainerNet.getContrastiveDP(_DISP_MAX_TAB_[nsample], _WIDTH_TAB_[nsample], opt['th_sup'],  opt['th_occ'],  opt['loss_margin'], _EMBED_NET_, _HEAD_NET_)  
       
+      elseif( method == 'pipeline' ) then 
+      
+        tr_net, criterion = trainerNet.getPipeline(_DISP_MAX_TAB_[nsample], _WIDTH_TAB_[nsample], opt['th_sup'],  opt['loss_margin'], _EMBED_NET_, _HEAD_NET_)
+
       end
     
       -- put training network on cuda
@@ -335,9 +383,9 @@ for nepoch = 1, opt['train_nb_epoch'] do
   local timestamp = os.date("%Y_%m_%d_%X_")
   
   -- compute validation error
-  local valid_err 
-  do 
- 
+  local valid_err = 1/0
+  
+  do
     local net_fname = 'tmp/' ..timestamp.. '.t7';
  
     -- save current network 
@@ -354,13 +402,13 @@ for nepoch = 1, opt['train_nb_epoch'] do
     else
       set_name = set
     end
-    
+        
     local exec_str 
-    if arch == 'fst-mb' or arch == 'fst-kitti' then 
-      exec_str = './main.lua ' .. set_name .. ' our -a test_te -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
+    if arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-xxl' then 
+      exec_str = './main.lua ' .. set_name .. ' our -a test_te  -net_fname ../mil-mc-cnn/' .. net_fname 
     else
       -- since accurate architecture is very slow, we compute validation error only using several images
-      exec_str = './main.lua ' .. set_name .. ' our -a test_te -small_test 1 -sm_terminate cnn -net_fname ../mil-mc-cnn/' .. net_fname 
+      exec_str = './main.lua ' .. set_name .. ' our -a test_te -small_test 1  -net_fname ../mil-mc-cnn/' .. net_fname 
     end
  
     lfs.chdir('../mc-cnn')      -- switch current directory
@@ -369,7 +417,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
     local valid_err_str = string.gsub(result,'\n','');
     valid_err = tonumber(valid_err_str);
     lfs.chdir('../mil-mc-cnn')  
-      
+     
   end
     
   -- push new record to log
@@ -379,8 +427,10 @@ for nepoch = 1, opt['train_nb_epoch'] do
   trainingLog['dt']         = time_per_batch
   table.insert(_TRAIN_LOG_, trainingLog)
   
-  -- save network 
+  -- save network
+  local net_fname 
   do
+    
     local network = {}
     network[1] = _EMBED_NET_
     network[2] = _HEAD_NET_
@@ -394,11 +444,11 @@ for nepoch = 1, opt['train_nb_epoch'] do
     network[3] = optim_state
     network[4] = _TRAIN_LOG_
     
-    local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. timestamp.. '.t7'; -- history log 
+    hist_net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. timestamp.. '.t7'; -- history log 
+    torch.save(hist_net_fname, network, 'ascii');
+    net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. '.t7';             -- current state log
     torch.save(net_fname, network, 'ascii');
-    
-    local net_fname = 'work/' .. opt['debug_fname'] .. '/metricNet_' .. opt['debug_fname'] .. '.t7';             -- current state log
-    torch.save(net_fname, network, 'ascii');
+        
   end
     
   -- save log
@@ -444,18 +494,18 @@ for nepoch = 1, opt['train_nb_epoch'] do
   for nbatch = 1, opt['train_nb_batch'] do
     
    -- get batch
-   _TR_INPUT_, _WIDTH_TAB_, _DISP_MAX_TAB_ = unsupSet:get(opt['train_batch_size'])   
+   _TR_INPUT_, _WIDTH_TAB_, _DISP_MAX_TAB_ = unsupSet:get(opt['train_batch_size'], '../mil-mc-cnn/' .. net_fname )   
            
    -- some network we need only two epopolar lines
    if method == 'contrastive' or method == 'contrastive-dp' then
-      _TR_INPUT_[3] = nil
+    _TR_INPUT_[3] = nil
    end
       
    -- put on gpu
    for nsample = 1, opt.train_batch_size do
     for i = 1,#_TR_INPUT_ do
-      _TR_INPUT_[i][nsample] = _TR_INPUT_[i][nsample]:cuda()
-    end
+       _TR_INPUT_[i][nsample] = _TR_INPUT_[i][nsample]:cuda()
+       end
    end
        
    -- optimize 
