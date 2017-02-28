@@ -51,6 +51,29 @@ function trainerNet.getMilContrastive(disp_max, width, th_sup, th_occ, loss_marg
 
 end
 
+function trainerNet.getPipeline(disp_max, width, th_sup, loss_margin, embed_net, head_net)
+    
+  --[[
+  Input: {{ref, pos}, matchInRow_pipe}, where ref, neg are tensor 1 x (2*hpatch + 1) x width 
+  ]]--
+  
+  local Net = nn.Sequential()
+  local comNet = nn.ParallelTable()
+  Net:add( comNet )
+  
+  local metricNet = cnnMetric.setupSiamese(embed_net, head_net, width, disp_max) ;
+  comNet:add( metricNet )  
+  comNet:add( nn.Identity() )
+  --Net:add( metricNet )
+  Net:add( nn.pipeline(th_sup) ) 
+
+  local fwdCst = nn.MarginRankingCriterion(loss_margin);
+  local bwdCst = nn.MarginRankingCriterion(loss_margin);
+  local criterion = nn.ParallelCriterion():add(fwdCst,1):add(bwdCst,1)
+
+  return Net, criterion
+end
+
 function trainerNet.getMil(disp_max, width, loss_margin, embed_net, head_net)
     
   --[[
