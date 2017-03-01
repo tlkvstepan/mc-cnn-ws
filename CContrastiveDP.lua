@@ -51,7 +51,7 @@ function contrastiveDP:updateOutput(input)
   
   local E_masked = input -- cuda if cuda mode
   local E_masked_VEC = E_masked:view(dim*dim)
-  local indices = self.pathNonOcc:nonzero() -- cuda not supported for this opperation
+  local indices = self.pathNonOcc:double():nonzero():cuda() -- cuda not supported for this opperation
   --if( input:type() == "torch.CudaTensor"  )then
  -- local indices = torch.CudaLongTensor()
   --indices:resize(indices:size())
