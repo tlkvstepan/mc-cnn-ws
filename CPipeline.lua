@@ -45,6 +45,7 @@ function pipeline:updateOutput(input)
     
     local E_pipe = simMatFwd_vec:index(1, (self.matchCol_pipe + (self.matchRow_pipe-1)*dim):cudaLong()) 
       
+    if self.th_sup > 0 then  
     for d = -self.th_sup, self.th_sup do
       
        -- fwd
@@ -59,6 +60,7 @@ function pipeline:updateOutput(input)
        ind[ind:gt(dim)] = dim
        simMatBwd_vec:indexFill(1, (self.matchCol_pipe + ( ind - 1 )*dim):cudaLong(), -1/0 )
        
+    end
     end
     
     local E_maxInRow_greedy, I_maxInRow_greedy = torch.max(simMatFwd, 2)

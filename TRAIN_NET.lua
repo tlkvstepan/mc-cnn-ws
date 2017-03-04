@@ -72,31 +72,35 @@ cmd = torch.CmdLine()
 -- debug setting
 dbg = dbg or 'debug';
 method = method or 'pipeline'
-arch = arch or 'fst-xxl'
+arch = arch or 'fst-kitti'
 set = set or 'kitti'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
-assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
+assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
 if dbg == 'normal' then
   -- for real training 
-  cmd:option('-train_batch_size', 370)   
+  cmd:option('-train_batch_size', 256)   
   cmd:option('-train_nb_batch', 100)        
   cmd:option('-train_nb_epoch', 1000)        
 elseif dbg == 'tune' then
-  cmd:option('-train_batch_size', 370)     
-  cmd:option('-train_nb_batch', 100)        
-  cmd:option('-train_nb_epoch', 5)        
+  cmd:option('-train_batch_size', 256)     
+  cmd:option('-train_nb_batch', 5)        
+  cmd:option('-train_nb_epoch', 10)        
 else 
-  cmd:option('-train_batch_size', 150)     
+  cmd:option('-train_batch_size', 256)     
   cmd:option('-train_nb_batch', 1)        
   cmd:option('-train_nb_epoch', 10)        
 end
 
 -- semi-supervised method parameters
 cmd:option('-loss_margin', 0.2)
-cmd:option('-th_sup', 2) 
+if method == 'pipeline' then
+  cmd:option('-th_sup', 20) 
+else
+  cmd:option('-th_sup', 2) 
+end
 cmd:option('-th_occ', 1)    
 
 -- dbg
@@ -108,6 +112,7 @@ else
 end
 
 cmd:option('-debug_start_from_net', '')
+
 
 opt = cmd:parse(arg)
 paths.mkdir('work/'..opt['debug_fname']); -- make output folder
@@ -245,7 +250,7 @@ end
 feval = function(param)
   
   -- set network parameters
-  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' then
+  if arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-xxl' then
     _EMBED_PARAM_:copy(param)
   else
     _EMBED_PARAM_:copy(param[{{1, _EMBED_PARAM_:size(1)}}])
@@ -283,7 +288,7 @@ feval = function(param)
     else
       sample_input[1] = _TR_INPUT_[1][nsample]
       sample_input[2] = _TR_INPUT_[2][nsample]
-      if _TR_INPUT_[3][nsample] ~= nil then
+      if _TR_INPUT_[3] ~= nil then
         sample_input[3] = _TR_INPUT_[3][nsample]
       end
     end
@@ -356,7 +361,7 @@ feval = function(param)
   
   _EMBED_GRAD_:div(nb_comp_ttl);
   
-  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl'  then
+  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' or  arch == 'fst-kitti-4x' then
     grad = _EMBED_GRAD_:clone()
   else 
     _HEAD_GRAD_:div(nb_comp_ttl);
@@ -367,7 +372,7 @@ feval = function(param)
 end
 
 -- initialize the parameters
-if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' then
+if arch == 'fst-kitti' or  arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-xxl' then
   cur_param = _EMBED_PARAM_:clone();
 else
   cur_param = torch.cat(_EMBED_PARAM_, _HEAD_PARAM_, 1)
@@ -402,20 +407,37 @@ for nepoch = 1, opt['train_nb_epoch'] do
     else
       set_name = set
     end
-        
-    local exec_str 
-    if arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-xxl' then 
-      exec_str = './main.lua ' .. set_name .. ' our -a test_te  -net_fname ../mil-mc-cnn/' .. net_fname 
-    else
-      -- since accurate architecture is very slow, we compute validation error only using several images
-      exec_str = './main.lua ' .. set_name .. ' our -a test_te -small_test 1  -net_fname ../mil-mc-cnn/' .. net_fname 
-    end
+    
+    -- compute Pipeline Err
+    
+    
+    --if arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-xxl' then 
+    --  exec_str = './main.lua ' .. set_name .. ' our -a test_te  -net_fname ../mil-mc-cnn/' .. net_fname 
+    --else
+     -- since accurate architecture is very slow, we compute validation error only using several images
+    --  exec_str = './main.lua ' .. set_name .. ' our -a test_te -small_test 1  -net_fname ../mil-mc-cnn/' .. net_fname 
+    --end
  
+    local exec_str
     lfs.chdir('../mc-cnn')      -- switch current directory
+    local test_size
+    if dbg == 'normal' then
+      test_size = 0 -- all
+    else
+      test_size = 5
+    end
+    -- compute WTA Err
+    exec_str = './main.lua ' .. set_name .. ' our-fast -a test_te -test_size '.. test_size ..' -sm_terminate cnn  -net_fname ../mil-mc-cnn/' .. net_fname 
     local handle = io.popen(exec_str)
     local result = handle:read("*a")
     local valid_err_str = string.gsub(result,'\n','');
-    valid_err = tonumber(valid_err_str);
+    WTA_err = tonumber(valid_err_str);
+    -- compute Pipeline Err
+    exec_str = './main.lua ' .. set_name .. ' our-fast -a test_te -test_size '.. test_size ..' -net_fname ../mil-mc-cnn/' .. net_fname 
+    local handle = io.popen(exec_str)
+    local result = handle:read("*a")
+    local valid_err_str = string.gsub(result,'\n','');
+    Pipeline_err = tonumber(valid_err_str);
     lfs.chdir('../mil-mc-cnn')  
      
   end
@@ -423,7 +445,8 @@ for nepoch = 1, opt['train_nb_epoch'] do
   -- push new record to log
   local trainingLog = {}
   trainingLog['train_loss'] = train_loss
-  trainingLog['valid_err']  = valid_err
+  trainingLog['WTA_err']         = WTA_err
+  trainingLog['Pipeline_err']    = Pipeline_err
   trainingLog['dt']         = time_per_batch
   table.insert(_TRAIN_LOG_, trainingLog)
   
@@ -457,25 +480,44 @@ for nepoch = 1, opt['train_nb_epoch'] do
   do
     log_fname = 'work/' .. opt['debug_fname'] .. '/err_' .. opt['debug_fname'] ..'_'.. timestampBeg.. '.txt';
     local f = io.open(log_fname, 'w')
-    f:write(string.format("%d, %f, %f, %f\n", 1, 0, 1/0, _TRAIN_LOG_[1].valid_err))
-    time = 0
-    for i = 1, #_TRAIN_LOG_ do
-      if _TRAIN_LOG_[i].dt ~= 1/0 then -- it is initial iteration than skip it
-        time  = time  + _TRAIN_LOG_[i].dt
-        f:write(string.format("%d, %f, %f, %f\n", i, time, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].valid_err))
-        f:write(string.format("%d, %f, %f, %f\n", i, time, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].valid_err))
+    --f:write("iteration, train_loss, WTA_err, Pipeline_err\n")
+    f:write(string.format("%f, %f, %f, %f\n", 1, 1/0, _TRAIN_LOG_[1].WTA_err, _TRAIN_LOG_[1].Pipeline_err))
+    for i = 2, #_TRAIN_LOG_ do
+      if _TRAIN_LOG_[i].train_loss ~= 1/0 then -- it is initial iteration than skip it
+        f:write(string.format("%f, %f, %f, %f\n", i, _TRAIN_LOG_[i].train_loss, _TRAIN_LOG_[i].WTA_err, _TRAIN_LOG_[i].Pipeline_err))
       end
     end
     f:close()
   end
   
+  -- compute speed of pipeline error change
+  local err_avg_change 
+  do
+    pipline_err_change = {}
+    k = 1;
+    for i = #_TRAIN_LOG_,1,-1 do
+      if _TRAIN_LOG_[i].train_loss ~= 1/0 then
+        pipline_err_change[k] = - _TRAIN_LOG_[i].Pipeline_err + _TRAIN_LOG_[i-1].Pipeline_err
+        k = k+1
+        if( k > 20 ) then 
+          break;
+        end
+      end
+    end
+    if( k > 1 ) then
+      err_avg_change = torch.Tensor(pipline_err_change):mean()
+    else
+      err_avg_change  = 0;
+    end
+  end  
+  
   -- print log
-  print(string.format("epoch %d, time = %f, train_loss = %f, valid_err = %f\n", nepoch, time, _TRAIN_LOG_[#_TRAIN_LOG_].train_loss, _TRAIN_LOG_[#_TRAIN_LOG_].valid_err))
+  print(string.format("epoch %d, train_loss = %f, WTA_err = %f, Pipeline_err  = %f, Pipeline_err change = %f\n", nepoch, _TRAIN_LOG_[#_TRAIN_LOG_].train_loss, _TRAIN_LOG_[#_TRAIN_LOG_].WTA_err, _TRAIN_LOG_[#_TRAIN_LOG_].Pipeline_err, err_avg_change))
     
   -- save current training plot 
   -- two graphs, one for training (blue) and one for test (red)
   gnuplot.epsfigure('work/' .. opt['debug_fname'] .. '/plot_' .. opt['debug_fname'] .. '.eps')
-  file = 'err_TRAIN_CONTRASTIVEDP_FSTXXL_KITTIEXT_2017_02_18_18:56:22.txt'
+  --file = 'err_TRAIN_CONTRASTIVEDP_FSTXXL_KITTIEXT_2017_02_18_18:56:22.txt'
   gnuplot.raw('set ylabel "train loss"')
   gnuplot.raw('set y2label "valid. err, [%]"')
   gnuplot.raw('set xlabel "iter"')
@@ -485,8 +527,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
   gnuplot.raw('set logscale x')
   gnuplot.raw('set logscale y')
   gnuplot.raw('set logscale y2')
-  gnuplot.raw("plot '" .. log_fname .. "' using ($1):(($4))  title 'valid. err' axes x1y2, '"
-                     .. log_fname .. "' using ($1):(($3))  title 'train. loss' axes x1y1")
+  gnuplot.raw("plot '" .. log_fname .. "' using ($1):(($3))  title 'WTA err' axes x1y2, '" .. log_fname .. "' using ($1):(($4))  title 'Pipeline err' axes x1y2, '" .. log_fname .. "' using ($1):(($2))  title 'train. loss' axes x1y1")
   gnuplot.plotflush()
     
   -- go through batches
@@ -512,7 +553,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
    optim.adam(feval, cur_param, {}, _OPTIM_STATE_)    
    
    -- update parameters
-  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' then
+  if arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-xxl' then
     _EMBED_PARAM_:copy(cur_param)
   else
     _EMBED_PARAM_:copy(cur_param[{{1, _EMBED_PARAM_:size(1)}}])
@@ -531,6 +572,15 @@ for nepoch = 1, opt['train_nb_epoch'] do
   
   -- compute trainin loss for epoch
   train_loss = torch.Tensor(batch_loss):mean();
+  
+ -- if method == 'pipeline' then
+ --   opt.th_sup = math.max(torch.round(opt.th_sup / 1.3), 2)
+ -- end
+  
+ -- if( err_avg_change < 5e-5 ) then
+ --   print('Optimization finished')
+ --   break
+ -- end
   
 end
 
