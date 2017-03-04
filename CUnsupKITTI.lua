@@ -15,7 +15,7 @@ local unsupKITTI = torch.class('unsupKITTI')
     self.hpatch = hpatch
     self.height = 370
     self.width = 1242;
-    self.nb_epi_per_image = 30; 
+    self.nb_epi_per_image = 32; 
         
     if setName == 'kitti' or setName == 'kitti_ext' then
         
