@@ -13,8 +13,7 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
     else
       self.nbFrames = 1
     end
-      
-      
+          
     local timestamp = os.date("%Y_%m_%d_%X") 
     local random_key = math.random(1,100000000)
     self.use_gt = use_gt
@@ -76,10 +75,11 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
         
         repeat
         
+        
+          
           -- get image 
           local n = (torch.random() % (self.nbIm)) + 1;
-       --   print(n)
-
+       
           if self.setName == 'kitti2015' or self.setName == 'kitti' then
             nFrame = 10
             nImg = n;
@@ -96,15 +96,24 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
             set = 'testing'
             nImg = nImg - self.train_nbIm;
           end
-
+                    
           -- images file name
           im0_fname = self.im0_fname:format(set, nImg, nFrame)  
           im1_fname = self.im1_fname:format(set, nImg, nFrame)
           gt_fname  = self.gt_fname:format(nImg, nFrame)
         
-        --- TO-DO
         
-        until ( utils.file_exists(im0_fname) and utils.file_exists(im1_fname) )
+          -- reftify odds of selecting GT
+          accept = true
+          if nFrame ~= 10 or set ~= 'training'  then
+            if( torch.uniform() < ((1-self.use_gt)*(1/(self.nbFrames*2)))/((1-1/(self.nbFrames*2))*(self.use_gt)) ) then
+              accept = true;
+            else
+              accept = false;
+            end
+          end
+        
+        until ( utils.file_exists(im0_fname) and utils.file_exists(im1_fname) and accept)
       
         -- run pipeline for the image 
         do

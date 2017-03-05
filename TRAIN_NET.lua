@@ -79,7 +79,7 @@ assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive'
 assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
-cmd:option('-use_gt', false)   
+cmd:option('-use_gt', 0.5)   
   
   
 if dbg == 'normal' then
