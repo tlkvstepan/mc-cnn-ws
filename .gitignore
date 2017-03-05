@@ -4,6 +4,8 @@
 *.bin
 *.*~
 *.so
+*.png
+*.bin
 
 # Folder
 work

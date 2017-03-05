@@ -54,7 +54,7 @@ dofile('CPipeline.lua');
 
 dofile('CUnsupMB.lua')                     
 dofile('CUnsupKITTI.lua')
-dofile('CUnsupPipeKITTI.lua')
+dofile('CUnsupPipeKITTI_with_GT.lua')
 
 cnnMetric = dofile('CCNNMetric.lua');      
 testFun = dofile('CTestUtils.lua');         -- Function that performs test on validation set
@@ -73,23 +73,26 @@ cmd = torch.CmdLine()
 dbg = dbg or 'debug';
 method = method or 'pipeline'
 arch = arch or 'fst-kitti'
-set = set or 'kitti'
+set = set or 'kitti2015'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
 assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
+cmd:option('-use_gt', false)   
+  
+  
 if dbg == 'normal' then
   -- for real training 
-  cmd:option('-train_batch_size', 256)   
-  cmd:option('-train_nb_batch', 100)        
+  cmd:option('-train_batch_size', 300)   
+  cmd:option('-train_nb_batch', 10)        
   cmd:option('-train_nb_epoch', 1000)        
 elseif dbg == 'tune' then
-  cmd:option('-train_batch_size', 256)     
+  cmd:option('-train_batch_size', 300)     
   cmd:option('-train_nb_batch', 5)        
   cmd:option('-train_nb_epoch', 10)        
 else 
-  cmd:option('-train_batch_size', 256)     
+  cmd:option('-train_batch_size', 300)     
   cmd:option('-train_nb_batch', 1)        
   cmd:option('-train_nb_epoch', 10)        
 end
@@ -186,7 +189,8 @@ if set == 'kitti_ext' or set == 'kitti' then
   
   if method == 'pipeline' then
     
-    unsupSet = unsupPipeKITTI('data/kitti_ext', set, hpatch);
+    unsupSet = unsupPipeKITTI('data/kitti_ext', set, opt.use_gt, hpatch);
+    --unsupSet = unsupPipeKITTI('data/kitti_ext', set, hpatch);
   
   else
   
@@ -198,7 +202,8 @@ elseif set == 'kitti2015' or set == 'kitti2015_ext' then
   
   if method == 'pipeline' then  
   
-    unsupSet = unsupPipeKITTI('data/kitti15_ext', set, hpatch);
+    unsupSet = unsupPipeKITTI('data/kitti15_ext', set, opt.use_gt, hpatch);
+    --unsupSet = unsupPipeKITTI('data/kitti15_ext', set, hpatch);
   
   else
     
@@ -573,9 +578,9 @@ for nepoch = 1, opt['train_nb_epoch'] do
   -- compute trainin loss for epoch
   train_loss = torch.Tensor(batch_loss):mean();
   
- -- if method == 'pipeline' then
- --   opt.th_sup = math.max(torch.round(opt.th_sup / 1.3), 2)
- -- end
+  if method == 'pipeline' and dbg == 'normal' then
+    opt.th_sup = math.max(torch.round(opt.th_sup / 1.3), 2)
+  end
   
  -- if( err_avg_change < 5e-5 ) then
  --   print('Optimization finished')
