@@ -23,6 +23,7 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
         
     if setName == 'kitti' or setName == 'kitti_ext' then
         
+        self.gt_fname  = baseFolder .. '/training/disp_noc/%06d_%02d.png' 
         self.im0_fname = baseFolder .. '/%s/image_0/%06d_%02d.png' 
         self.im1_fname = baseFolder .. '/%s/image_1/%06d_%02d.png'
         
@@ -32,7 +33,8 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
         self.nb_ch = 1;
         
     elseif setName == 'kitti2015' or setName == 'kitti2015_ext' then
-            
+        
+        self.gt_fname  = baseFolder .. '/training/disp_noc0/%06d_%01d.png' 
         self.im0_fname = baseFolder .. '/%s/image_2/%06d_%01d.png' 
         self.im1_fname = baseFolder .. '/%s/image_3/%06d_%01d.png'
         self.test_nbIm  = 200
@@ -94,8 +96,9 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
           -- images file name
           im0_fname = self.im0_fname:format(set, nImg, nFrame)  
           im1_fname = self.im1_fname:format(set, nImg, nFrame)
-
-        until ( utils.file_exists(im0_fname) and utils.file_exists(im1_fname) )
+          gt_fname  = self.gt_fname:format(nImg, nFrame)
+        
+        until ( utils.file_exists(im0_fname) and utils.file_exists(im1_fname) and set == 'training' and nFrame == 10)
       
         -- run pipeline for the image 
         do
@@ -107,8 +110,20 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
           else 
             set_name = self.setName
           end
-          local patt_str = './main.lua %s our-fast -a predict -net_fname %s -left ../mil-mc-cnn/%s -right ../mil-mc-cnn/%s -disp_max %i'
-          local exec_str = patt_str:format(set_name, net_fname, im0_fname, im1_fname, torch.round(self.disp_max))
+          
+          local exec_str 
+          if set == 'training'  and nFrame == 10 then
+            
+            -- pass GT as well
+            local patt_str = './main_.lua %s our-fast -a predict -net_fname %s -left ../mil-mc-cnn/%s -right ../mil-mc-cnn/%s -gt ../mil-mc-cnn/%s -disp_max %i'         exec_str = patt_str:format(set_name, net_fname, im0_fname, im1_fname, gt_fname, torch.round(self.disp_max))
+                      
+          else
+            
+            -- dont pass GT
+            local patt_str = './main_.lua %s our-fast -a predict -net_fname %s -left ../mil-mc-cnn/%s -right ../mil-mc-cnn/%s -disp_max %i'
+            exec_str = patt_str:format(set_name, net_fname, im0_fname, im1_fname, torch.round(self.disp_max))
+          
+          end
           
           lfs.chdir('../mc-cnn')      -- switch current directory
           local handle = io.popen(exec_str)
@@ -126,7 +141,8 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
         
         -- read disparity
         disp = torch.FloatTensor(torch.FloatStorage('../mc-cnn/disp.bin')):view(actual_height, actual_width);
-        ---image.save('disp.png', utils.scale2_01(disp))
+        image.save('disp.png', utils.scale2_01(disp))
+        image.save('im_.png', utils.scale2_01(im0))
         -- read occlusions    
         local occ = torch.FloatTensor(torch.FloatStorage('../mc-cnn/occ.bin')):view(actual_height, actual_width);
         disp[occ:ne( 0 ):byte()] = 1/0
