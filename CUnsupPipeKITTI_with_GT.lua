@@ -154,7 +154,7 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
         
         -- read disparity
         disp = torch.FloatTensor(torch.FloatStorage('../mc-cnn/' .. self.disp_fname.. '.bin')):view(actual_height, actual_width);
-        image.save(self.disp_fname ..'.png', utils.scale2_01(disp))
+      --  image.save(self.disp_fname ..'.png', utils.scale2_01(disp))
         --image.save(self.disp_fname '.png', utils.scale2_01(im0))
         -- read occlusions    
         local occ = torch.FloatTensor(torch.FloatStorage('../mc-cnn/' .. self.occ_fname.. '.bin')):view(actual_height, actual_width);
