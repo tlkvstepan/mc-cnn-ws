@@ -75,8 +75,6 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
         
         repeat
         
-        
-          
           -- get image 
           local n = (torch.random() % (self.nbIm)) + 1;
        
@@ -148,7 +146,6 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
           lfs.chdir('../mil-mc-cnn')  
         end
         
-        
         -- read images
         im0 = image.loadPNG(im0_fname, self.nb_ch, 'byte'):float()
         im1 = image.loadPNG(im1_fname, self.nb_ch, 'byte'):float()
@@ -161,7 +158,7 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
         --image.save(self.disp_fname '.png', utils.scale2_01(im0))
         -- read occlusions    
         local occ = torch.FloatTensor(torch.FloatStorage('../mc-cnn/' .. self.occ_fname.. '.bin')):view(actual_height, actual_width);
-        image.save(self.occ_fname ..'.png', utils.scale2_01(occ))
+        --image.save(self.occ_fname ..'.png', utils.scale2_01(occ))
         disp[occ:ne( 0 ):byte()] = 1/0
         
         -- convert to luminance
@@ -185,14 +182,7 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
     epiRef[nEpi] =  im0[{{},{rowMin,rowMax},{}}]:double();
     epiPos[nEpi] =  im1[{{},{rowMin,rowMax},{}}]:double();
     local epi_disp =  torch.round(disp[{rowRefCent,{}}]:double());
-    
-   -- if disp:size(2) ~= im0:size(3) then
-   --    error('different width')
-   -- end
         
-    -- get gt disparity for patches that have match
-    -- (col0 - disp) >= hpatch + 1  ==> col1 >= hpatch + 1
-    -- col0 <= width - hpatch       
     epi_disp = epi_disp[{{self.hpatch+1, actual_width-self.hpatch}}]
     local col0 = torch.range(1, actual_width-2*self.hpatch)
     
@@ -203,14 +193,7 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
     
     epiMatchIdx[nEpi] = col1  
      
-    --if ( epiPos[nEpi]:size(3)-2*self.hpatch ~= epiMatchIdx[nEpi]:size(1) ) then
-    --  d = 1
-    --end
-     --if epiPos[nEpi]:size(3)-2*self.hpatch ~= epiMatchIdx[nEpi]:size(1) then
-     --   k = 1
-     --end
-      
-     
+    collectgarbage()
   end
    
   return {epiRef, epiPos, epiMatchIdx}, tabWidth, tabDisp 

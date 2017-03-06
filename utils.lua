@@ -3,6 +3,14 @@ local utils = {}
 require 'torch'
 require 'image'
 
+function utils.get_random_file_name()
+    
+    local timestamp = os.date("%Y_%m_%d_%X") 
+    local random_key = math.random(1,100000000)
+    
+    return timestamp .. '_' .. random_key 
+end
+
 function utils.fromfile(fname)
   
    local file = io.open(fname .. '.dim')
