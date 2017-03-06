@@ -43,7 +43,7 @@ function pipeline:updateOutput(input)
     local simMatFwd_vec = simMatFwd:view(dim*dim)
     local simMatBwd_vec = simMatBwd:view(dim*dim)
     
-    local E_pipe = simMatFwd_vec:index(1, (self.matchCol_pipe + (self.matchRow_pipe-1)*dim):cudaLong()) 
+    local E_pipe = simMatFwd_vec:index(1, (self.matchCol_pipe + (self.matchRow_pipe-1)*dim):long()) 
       
     if self.th_sup > 0 then  
     for d = -self.th_sup, self.th_sup do
@@ -52,13 +52,13 @@ function pipeline:updateOutput(input)
        local ind =  self.matchCol_pipe + d
        ind[ind:lt(1)] = 1
        ind[ind:gt(dim)] = dim
-       simMatFwd_vec:indexFill(1, (ind + ( self.matchRow_pipe - 1 )*dim):cudaLong(), -1/0 )
+       simMatFwd_vec:indexFill(1, (ind + ( self.matchRow_pipe - 1 )*dim):long(), -1/0 )
        
        -- bwd 
        ind = self.matchRow_pipe + d
        ind[ind:lt(1)] = 1
        ind[ind:gt(dim)] = dim
-       simMatBwd_vec:indexFill(1, (self.matchCol_pipe + ( ind - 1 )*dim):cudaLong(), -1/0 )
+       simMatBwd_vec:indexFill(1, (self.matchCol_pipe + ( ind - 1 )*dim):long(), -1/0 )
        
     end
     end
@@ -74,11 +74,11 @@ function pipeline:updateOutput(input)
     
     
     -- remain only el that exist in the pipeline solution
-    E_maxInRow_greedy = E_maxInRow_greedy:index(1,self.matchRow_pipe:cudaLong()) 
-    self.I_maxInRow_greedy = I_maxInRow_greedy:index(1,self.matchRow_pipe:cudaLong())
+    E_maxInRow_greedy = E_maxInRow_greedy:index(1,self.matchRow_pipe:long()) 
+    self.I_maxInRow_greedy = I_maxInRow_greedy:index(1,self.matchRow_pipe:long())
     --
-    E_maxInCol_greedy = E_maxInCol_greedy:index(1,self.matchCol_pipe:cudaLong()) 
-    self.I_maxInCol_greedy = I_maxInCol_greedy:index(1,self.matchCol_pipe:cudaLong()) 
+    E_maxInCol_greedy = E_maxInCol_greedy:index(1,self.matchCol_pipe:long()) 
+    self.I_maxInCol_greedy = I_maxInCol_greedy:index(1,self.matchCol_pipe:long()) 
     --
     self.output = {{E_pipe, E_maxInRow_greedy}, {E_pipe, E_maxInCol_greedy}}
   
@@ -108,15 +108,15 @@ function pipeline:updateGradInput(input, gradOutput)
   local idx
   
   idx = self.matchCol_pipe + (self.matchRow_pipe-1)*dim;
-  igrad_simMat_vec:indexAdd(1, idx, ograd_pipe1:squeeze() + ograd_pipe2:squeeze())
+  igrad_simMat_vec:indexAdd(1, idx:long(), ograd_pipe1:squeeze() + ograd_pipe2:squeeze())
   
   -- fwd
   idx = self.I_maxInRow_greedy + (self.matchRow_pipe-1)*dim;
-  igrad_simMat_vec:indexAdd(1, idx, ograd_maxInRow:squeeze())
+  igrad_simMat_vec:indexAdd(1, idx:long(), ograd_maxInRow:squeeze())
   
   -- bwd
   idx = self.matchCol_pipe + (self.I_maxInCol_greedy-1)*dim;
-  igrad_simMat_vec:indexAdd(1, idx, ograd_maxInCol:squeeze())
+  igrad_simMat_vec:indexAdd(1, idx:long(), ograd_maxInCol:squeeze())
     
   self.gradInput = {igrad_simMat, matchCol_pipe:zero()}  
   
