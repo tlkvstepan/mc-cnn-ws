@@ -73,7 +73,7 @@ cmd = torch.CmdLine()
 -- debug setting
 dbg = dbg or 'debug';
 method = method or 'pipeline'
-arch = arch or 'fst-kitti'
+arch = arch or 'fst-kitti-4x'
 set = set or 'kitti2015'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
@@ -94,14 +94,14 @@ elseif dbg == 'tune' then
   cmd:option('-train_nb_epoch', 10)        
 else 
   cmd:option('-train_batch_size', 300)     
-  cmd:option('-train_nb_batch', 2)        
+  cmd:option('-train_nb_batch', 1)        
   cmd:option('-train_nb_epoch', 10)        
 end
 
 -- semi-supervised method parameters
 cmd:option('-loss_margin', 0.2)
 if method == 'pipeline' then
-  cmd:option('-th_sup', 20) 
+  cmd:option('-th_sup', 20) --20 
 else
   cmd:option('-th_sup', 2) 
 end
@@ -126,9 +126,10 @@ local timestampBeg = os.date("%Y_%m_%d_%X")
 cmd:log('work/' .. opt['debug_fname'] .. '/log_' .. opt['debug_fname'] .. '_' .. timestampBeg .. '.txt', opt, 'ascii')
 print('Semi-suprevised training. Method: ' .. method .. ', arch: ' .. arch.. ', set: ' .. set.. ', mode: ' .. dbg)
 
-math.randomseed(0); 
-torch.manualSeed(0)
-
+if dbg == 'debug' then
+  math.randomseed(0); 
+  torch.manualSeed(0)
+end
 ---------------------------- initialize / load networks 
 
 local  hpatch
