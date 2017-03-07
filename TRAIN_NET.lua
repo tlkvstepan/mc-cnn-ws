@@ -192,7 +192,7 @@ if set == 'kitti_ext' or set == 'kitti' then
 
   if method == 'pipeline' then
 
-    unsupSet = unsupPipeKITTI('data/kitti_ext', set, opt.use_gt, hpatch);
+    unsupSet = unsupPipeKITTI('data/kitti_ext', set, opt.use_gt, hpatch, opt.debug_fname);
     --unsupSet = unsupPipeKITTI('data/kitti_ext', set, hpatch);
 
   else
@@ -205,7 +205,7 @@ elseif set == 'kitti2015' or set == 'kitti2015_ext' then
 
   if method == 'pipeline' then  
 
-    unsupSet = unsupPipeKITTI('data/kitti15_ext', set, opt.use_gt, hpatch);
+    unsupSet = unsupPipeKITTI('data/kitti15_ext', set, opt.use_gt, hpatch, opt.debug_fname);
     --unsupSet = unsupPipeKITTI('data/kitti15_ext', set, hpatch);
 
   else
