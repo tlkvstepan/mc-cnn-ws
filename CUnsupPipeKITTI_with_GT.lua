@@ -4,7 +4,7 @@
 
 local unsupPipeKITTI = torch.class('unsupPipeKITTI')
   
-  function unsupPipeKITTI:__init(baseFolder, setName, use_gt, hpatch)
+  function unsupPipeKITTI:__init(baseFolder, setName, use_gt, hpatch, unique_name)
     
     self.baseFolder = baseFolder;
     
@@ -13,12 +13,14 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
     else
       self.nbFrames = 1
     end
-          
     local timestamp = os.date("%Y_%m_%d_%X") 
     local random_key = math.random(1,100000000)
     self.use_gt = use_gt
-    self.occ_fname  = 'occ_' .. timestamp .. '_' ..  random_key
-    self.disp_fname = 'disp_' .. timestamp .. '_' .. random_key
+    self.occ_fname  = 'occ_' .. unique_name
+    self.disp_fname = 'disp_' .. unique_name
+    
+    print(self.occ_fname ..'\n')
+    print(self.disp_fname..'\n')
     self.maxBatchSize = 370 - hpatch*2
     self.setName = setName 
     self.hpatch = hpatch
