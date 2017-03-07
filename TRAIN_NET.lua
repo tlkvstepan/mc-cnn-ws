@@ -74,7 +74,7 @@ cmd = torch.CmdLine()
 dbg = dbg or 'debug';
 method = method or 'pipeline'
 arch = arch or 'fst-kitti-4x'
-set = set or 'kitti2015'
+set = set or 'kitti'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
 assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
@@ -101,12 +101,11 @@ end
 -- semi-supervised method parameters
 cmd:option('-loss_margin', 0.2)
 
--- for pipeline we 
---if method == 'pipeline' then
---  cmd:option('-th_sup', 20) --20 
---else
-cmd:option('-th_sup', 2) 
---end
+if method == 'pipeline' then
+  cmd:option('-th_sup', 20) --20 
+else
+  cmd:option('-th_sup', 2) 
+end
 cmd:option('-th_occ', 1)    
 cmd:option('-reset_optim', 0) 
 
@@ -576,7 +575,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
 
     -- optimize 
     config = {}
-    config.learningRate = 1e-4 
+    config.learningRate = 1e-4
     optim.adam(feval, cur_param, config, _OPTIM_STATE_)    
     batch_loss[nbatch] = _TR_LOSS_
 
