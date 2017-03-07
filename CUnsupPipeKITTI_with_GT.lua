@@ -13,8 +13,7 @@ local unsupPipeKITTI = torch.class('unsupPipeKITTI')
     else
       self.nbFrames = 1
     end
-    local timestamp = os.date("%Y_%m_%d_%X") 
-    local random_key = math.random(1,100000000)
+        
     self.use_gt = use_gt
     self.occ_fname  = 'occ_' .. unique_name
     self.disp_fname = 'disp_' .. unique_name
