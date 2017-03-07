@@ -100,12 +100,15 @@ end
 
 -- semi-supervised method parameters
 cmd:option('-loss_margin', 0.2)
-if method == 'pipeline' then
-  cmd:option('-th_sup', 20) --20 
-else
-  cmd:option('-th_sup', 2) 
-end
+
+-- for pipeline we 
+--if method == 'pipeline' then
+--  cmd:option('-th_sup', 20) --20 
+--else
+cmd:option('-th_sup', 2) 
+--end
 cmd:option('-th_occ', 1)    
+cmd:option('-reset_optim', 0) 
 
 -- dbg
 if dbg == 'debug' then
@@ -170,6 +173,10 @@ else
     _OPTIM_STATE_ = {}
   end
 end
+
+--if opt.reset_optim == 1 then
+--    _OPTIM_STATE_ = {}
+--end
 
 -- put optimization state on gpu
 --if _OPTIM_STATE_.m then
@@ -568,7 +575,9 @@ for nepoch = 1, opt['train_nb_epoch'] do
     end
 
     -- optimize 
-    optim.adam(feval, cur_param, {}, _OPTIM_STATE_)    
+    config = {}
+    config.learningRate = 1e-4 
+    optim.adam(feval, cur_param, config, _OPTIM_STATE_)    
     batch_loss[nbatch] = _TR_LOSS_
 
     -- update parameters
