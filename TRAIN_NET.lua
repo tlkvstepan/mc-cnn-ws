@@ -598,6 +598,8 @@ for nepoch = 1, opt['train_nb_epoch'] do
       local temp_network = {};
       temp_network[1] = _EMBED_NET_
       temp_network[2] = _HEAD_NET_
+      temp_network[3] = _OPTIM_STATE_
+      temp_network[4] = _TRAIN_LOG_
       torch.save(cur_net_name, temp_network, 'ascii');
     end
 
