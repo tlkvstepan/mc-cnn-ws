@@ -435,7 +435,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
 
     
     -- compute WTA Err
-    print('computing performance\n');
+    --print('computing performance\n');
     local temp_exec_str 
     temp_exec_str = './main.lua ' .. temp_set_name .. ' our-fast -a test_te -test_size '.. temp_test_size ..
     ' -sm_terminate cnn  -net_fname ../mil-mc-cnn/' .. temp_net_name 
