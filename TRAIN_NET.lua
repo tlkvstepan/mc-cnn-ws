@@ -74,13 +74,8 @@ cmd = torch.CmdLine()
 -- debug setting
 dbg = dbg or 'debug';
 method = method or 'pipeline'
-<<<<<<< HEAD
-arch = arch or 'fst-kitti-4x'
-set = set or 'kitti'
-=======
 arch = arch or 'fst-mb'
 set = set or 'mb'
->>>>>>> 1d434a12bf2ab019d666a4bb242a3e3f836f75c1
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
 assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
@@ -107,10 +102,7 @@ end
 -- semi-supervised method parameters
 cmd:option('-loss_margin', 0.2)
 
-<<<<<<< HEAD
-=======
--- for pipeline we 
->>>>>>> 1d434a12bf2ab019d666a4bb242a3e3f836f75c1
+
 if method == 'pipeline' then
   cmd:option('-th_sup', 20) --20 
 else
