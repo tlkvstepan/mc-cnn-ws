@@ -121,7 +121,10 @@
           local exec_str = patt_str:format(net_fname, self.disp_fname, self.occ_fname, self.left_fname ..'.png', self.right_fname ..'.png', torch.round(disp_max))
           
           lfs.chdir('../mc-cnn')      -- switch current directory
+<<<<<<< HEAD
           print('computing pipeline results\n');
+=======
+>>>>>>> master
           local handle = io.popen(exec_str)
           handle :read('*all')
           handle :close()
@@ -139,10 +142,17 @@
         image.save(self.occ_fname ..'.png', utils.scale2_01(occ))
         disp[occ:ne( 0 ):byte()] = 1/0
         
+<<<<<<< HEAD
        -- print(disp:size())
         --print(occ:size())
         --print(img0:size())
         --print(img1:size())
+=======
+        print(disp:size())
+        print(occ:size())
+        print(im0:size())
+        print(im1:size())
+>>>>>>> master
         
       end
       
