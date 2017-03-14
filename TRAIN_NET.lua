@@ -54,6 +54,7 @@ dofile('CMilContrastive.lua');
 dofile('CPipeline.lua');
 
 dofile('CUnsupMB.lua')                     
+dofile('CUnsupPipeMB.lua')  
 dofile('CUnsupKITTI.lua')
 dofile('CUnsupPipeKITTI_with_GT.lua')
 
@@ -73,8 +74,8 @@ cmd = torch.CmdLine()
 -- debug setting
 dbg = dbg or 'debug';
 method = method or 'pipeline'
-arch = arch or 'fst-kitti-4x'
-set = set or 'kitti2015'
+arch = arch or 'fst-mb'
+set = set or 'mb'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
 assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
@@ -102,13 +103,12 @@ end
 cmd:option('-loss_margin', 0.2)
 
 -- for pipeline we 
---if method == 'pipeline' then
---  cmd:option('-th_sup', 20) --20 
---else
-cmd:option('-th_sup', 2) 
---end
+if method == 'pipeline' then
+  cmd:option('-th_sup', 20) --20 
+else
+  cmd:option('-th_sup', 2) 
+end
 cmd:option('-th_occ', 1)    
-cmd:option('-reset_optim', 0) 
 
 -- dbg
 if dbg == 'debug' then
@@ -223,36 +223,37 @@ elseif set == 'kitti2015' or set == 'kitti2015_ext' then
 
 elseif set == 'mb' then
 
+  local metadata_fname = 'data/mb/meta.bin'
+  local metadata = utils.fromfile(metadata_fname)
+  local img_tab = {}
+  local disp_tab = {}
+  for n = 1,metadata:size(1) do
+    local img_light_tab = {}
+    light = 1
+    while true do
+      fname = ('data/mb/x_%d_%d.bin'):format(n, light)
+      if not paths.filep(fname) then
+        break
+      end
+      table.insert(img_light_tab, utils.fromfile(fname))
+      light = light + 1
+    end
+    table.insert(img_tab, img_light_tab)
+    fname = ('data/mb/dispnoc%d.bin'):format(n)
+    if paths.filep(fname) then
+      table.insert(disp_tab, utils.fromfile(fname))
+    end
+    if metadata[{n,3}] == -1 then -- fill max_disp for train set
+      metadata[{n,3}] = disp_tab[n]:max()
+    end
+  end
+
   if method == 'pipeline' then
 
-    error('training with pipeline for mb is not yet implemented')
+   --error('training with pipeline for mb is not yet implemented')
+    unsupSet = unsupPipeMB(img_tab, metadata, hpatch, opt.debug_fname)
 
   else
-
-    local metadata_fname = 'data/mb/meta.bin'
-    local metadata = utils.fromfile(metadata_fname)
-    local img_tab = {}
-    local disp_tab = {}
-    for n = 1,metadata:size(1) do
-      local img_light_tab = {}
-      light = 1
-      while true do
-        fname = ('data/mb/x_%d_%d.bin'):format(n, light)
-        if not paths.filep(fname) then
-          break
-        end
-        table.insert(img_light_tab, utils.fromfile(fname))
-        light = light + 1
-      end
-      table.insert(img_tab, img_light_tab)
-      fname = ('data/mb/dispnoc%d.bin'):format(n)
-      if paths.filep(fname) then
-        table.insert(disp_tab, utils.fromfile(fname))
-      end
-      if metadata[{n,3}] == -1 then -- fill max_disp for train set
-        metadata[{n,3}] = disp_tab[n]:max()
-      end
-    end
 
     unsupSet = unsupMB(img_tab, metadata, hpatch)
 
