@@ -72,7 +72,7 @@ set = table.remove(arg, 1)
 cmd = torch.CmdLine()
 
 -- debug setting
-dbg = dbg or 'debug';
+dbg = dbg or 'normal';
 method = method or 'pipeline'
 arch = arch or 'fst-mb-4x'
 set = set or 'mb'
