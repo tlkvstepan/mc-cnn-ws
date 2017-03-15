@@ -10,6 +10,7 @@ function cnnMetric.getEmbeddNet(metricName)
   assert( metricName == 'fst-mb' or
           metricName == 'fst-kitti' or
           metricName == 'acrt-mb' or
+          metricName == 'fst-mb-4x' or
           metricName == 'acrt-kitti' or
           metricName == 'fst-kitti-4x' or
           metricName == 'fst-xxl','wrong network name!') 
@@ -22,6 +23,12 @@ function cnnMetric.getEmbeddNet(metricName)
   
     nbConvLayers = 5  
     nbFeatureMap = 64
+    kernel = 3
+  
+  elseif( metricName == 'fst-mb-4x' ) then
+  
+    nbConvLayers = 5  
+    nbFeatureMap = 256
     kernel = 3
   
   elseif( metricName == 'acrt-mb' ) then
@@ -70,6 +77,7 @@ end
 function cnnMetric.getHeadNet(metricName)
     
   assert( metricName == 'fst-mb' or
+          metricName == 'fst-mb-4x' or
           metricName == 'fst-kitti' or
           metricName == 'acrt-mb' or
           metricName == 'acrt-kitti' or
@@ -81,6 +89,12 @@ function cnnMetric.getHeadNet(metricName)
   if( metricName == 'fst-mb' ) then
   
     local nbFeatureMap = 64
+    
+    headNet = cnnMetric.cosHead(nbFeatureMap)
+  
+  elseif( metricName == 'fst-mb-4x' ) then
+  
+    local nbFeatureMap = 256
     
     headNet = cnnMetric.cosHead(nbFeatureMap)
     

@@ -74,11 +74,11 @@ cmd = torch.CmdLine()
 -- debug setting
 dbg = dbg or 'debug';
 method = method or 'pipeline'
-arch = arch or 'fst-mb'
+arch = arch or 'fst-mb-4x'
 set = set or 'mb'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
-assert(arch == 'fst-mb' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
+assert(arch == 'fst-mb' or arch == 'fst-mb-4x' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
 assert(set == 'mb' or set == 'kitti' or set == 'kitti2015' or set == 'kitti2015_ext' or set == 'kitti_ext')
 
 cmd:option('-use_gt', 0) -- dont use GT by default  
@@ -87,7 +87,7 @@ cmd:option('-use_gt', 0) -- dont use GT by default
 if dbg == 'normal' then
   -- for real training 
   cmd:option('-train_batch_size', 300)   
-  cmd:option('-train_nb_batch', 10)        
+  cmd:option('-train_nb_batch', 50)        
   cmd:option('-train_nb_epoch', 1000)        
 elseif dbg == 'tune' then
   cmd:option('-train_batch_size', 300)     
@@ -266,7 +266,7 @@ end
 feval = function(param)
 
   -- set network parameters
-  if arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-xxl' then
+  if arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-mb-4x' or arch == 'fst-xxl' then
     _EMBED_PARAM_:copy(param)
   else
     _EMBED_PARAM_:copy(param[{{1, _EMBED_PARAM_:size(1)}}])
@@ -377,7 +377,7 @@ feval = function(param)
 
   _EMBED_GRAD_:div(nb_comp_ttl);
 
-  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-xxl' or  arch == 'fst-kitti-4x' then
+  if arch == 'fst-kitti' or arch == 'fst-mb' or arch == 'fst-mb-4x' or arch == 'fst-xxl' or  arch == 'fst-kitti-4x' then
     grad = _EMBED_GRAD_:clone()
   else 
     _HEAD_GRAD_:div(nb_comp_ttl);
@@ -388,7 +388,7 @@ feval = function(param)
 end
 
 -- initialize the parameters
-if arch == 'fst-kitti' or  arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-xxl' then
+if arch == 'fst-kitti' or  arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-mb-4x' or arch == 'fst-xxl' then
   cur_param = _EMBED_PARAM_:clone();
 else
   cur_param = torch.cat(_EMBED_PARAM_, _HEAD_PARAM_, 1)
@@ -584,7 +584,7 @@ for nepoch = 1, opt['train_nb_epoch'] do
     batch_loss[nbatch] = _TR_LOSS_
 
     -- update parameters
-    if arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-xxl' then
+    if arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'fst-mb' or arch == 'fst-mb-4x' or arch == 'fst-xxl' then
       _EMBED_PARAM_:copy(cur_param)
     else
       _EMBED_PARAM_:copy(cur_param[{{1, _EMBED_PARAM_:size(1)}}])
