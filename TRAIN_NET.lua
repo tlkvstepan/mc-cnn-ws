@@ -39,7 +39,7 @@ require 'cunn'
 require 'cudnn'
 -- this configuration seems fastest
 cudnn.benchmark = true
---cudnn.fastest = true
+cudnn.fastest = true
 
 -- custom
 dofile('CHeadNetMulti.lua')  
@@ -87,7 +87,7 @@ cmd:option('-use_gt', 0) -- dont use GT by default
 if dbg == 'normal' then
   -- for real training 
   cmd:option('-train_batch_size', 300)   
-  cmd:option('-train_nb_batch', 50)        
+  cmd:option('-train_nb_batch', 100)        
   cmd:option('-train_nb_epoch', 1000)        
 elseif dbg == 'tune' then
   cmd:option('-train_batch_size', 300)     
