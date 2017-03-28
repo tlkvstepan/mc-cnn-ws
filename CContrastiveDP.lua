@@ -85,11 +85,11 @@ function contrastiveDP:updateOutput(input)
 
     -- compute maximum
     self.rowwiseMaxE, self.rowwiseMaxI = E_masked:max(2)
-    self.rowwiseMaxE = self.rowwiseMaxE:index(1,self.rows):squeeze():cuda()
-    self.rowwiseMaxI = self.rowwiseMaxI:index(1,self.rows):squeeze():cuda()
+    self.rowwiseMaxE = self.rowwiseMaxE:index(1,self.rows:long()):squeeze():cuda()
+    self.rowwiseMaxI = self.rowwiseMaxI:index(1,self.rows:long()):squeeze():cuda()
     self.colwiseMaxE, self.colwiseMaxI = E_masked:max(1)
-    self.colwiseMaxE = self.colwiseMaxE:index(2,self.cols):squeeze():cuda()
-    self.colwiseMaxI = self.colwiseMaxI:index(2,self.cols):squeeze():cuda()
+    self.colwiseMaxE = self.colwiseMaxE:index(2,self.cols:long()):squeeze():cuda()
+    self.colwiseMaxI = self.colwiseMaxI:index(2,self.cols:long()):squeeze():cuda()
     
     self.rows = self.rows:cuda()
     self.cols = self.cols:cuda() 

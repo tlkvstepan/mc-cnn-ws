@@ -72,10 +72,10 @@ set = table.remove(arg, 1)
 cmd = torch.CmdLine()
 
 -- debug setting
-dbg = dbg or 'normal';
-method = method or 'pipeline'
-arch = arch or 'fst-mb-4x'
-set = set or 'mb'
+dbg = dbg or 'tune';
+method = method or 'contrastive-dp'
+arch = arch or 'fst-kitti'
+set = set or 'kitti2015_ext'
 
 assert(method == 'mil' or method == 'contrastive' or method == 'mil-contrastive' or method == 'contrastive-dp' or method == 'pipeline')
 assert(arch == 'fst-mb' or arch == 'fst-mb-4x' or arch == 'fst-kitti' or arch == 'fst-kitti-4x' or arch == 'acrt-mb' or arch == 'acrt-kitti' or arch == 'fst-xxl')
@@ -91,8 +91,8 @@ if dbg == 'normal' then
   cmd:option('-train_nb_epoch', 1000)        
 elseif dbg == 'tune' then
   cmd:option('-train_batch_size', 300)     
-  cmd:option('-train_nb_batch', 5)        
-  cmd:option('-train_nb_epoch', 10)        
+  cmd:option('-train_nb_batch', 32)        
+  cmd:option('-train_nb_epoch', 100)        
 else 
   cmd:option('-train_batch_size', 300)     
   cmd:option('-train_nb_batch', 1)        
@@ -115,7 +115,7 @@ if dbg == 'debug' then
   local timestamp = os.date("test-%Y_%m_%d_%X")
   cmd:option('-debug_fname', timestamp)
 else
-  cmd:option('-debug_fname', 'experiments')
+  cmd:option('-debug_fname', 'NEW_EXTENDED_KITTI15')
 end
 
 cmd:option('-debug_start_from_net', '')

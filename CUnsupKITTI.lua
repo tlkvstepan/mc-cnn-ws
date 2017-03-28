@@ -74,10 +74,14 @@ local unsupKITTI = torch.class('unsupKITTI')
           nFrame = 10
           nImg = n;
        else
+          --nFrame = n % self.nbFrames
+          --nImg = n - nFrame*self.nbFrames;
           nFrame = n % self.nbFrames
-          nImg = n - nFrame*self.nbFrames;
+          nImg = math.floor(n / nFrame);
        end 
-     
+       
+       --print(nImg)
+       
         -- test or train?
         if nImg < self.train_nbIm then
           set = 'training' 
@@ -86,6 +90,8 @@ local unsupKITTI = torch.class('unsupKITTI')
           set = 'testing'
           nImg = nImg - self.train_nbIm;
         end
+        
+        --print(nImg)
         
         -- images location
         im0_fname = self.im0_fname:format(set, nImg, nFrame)  
