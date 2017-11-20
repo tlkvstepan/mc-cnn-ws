@@ -1,3 +1,0 @@
-rm tmp/*.*
-rm *.png
-rm *.out

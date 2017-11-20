@@ -4,6 +4,8 @@ local unsupKITTI = torch.class('unsupKITTI')
     
     self.baseFolder = baseFolder;
     
+    self.crop = false -- crop images to standard size
+    
     if( setName == 'kitti_ext' or setName == 'kitti2015_ext' ) then
       self.nbFrames = 20
     else
@@ -13,8 +15,10 @@ local unsupKITTI = torch.class('unsupKITTI')
     self.maxBatchSize = 370 - hpatch*2
     self.setName = setName 
     self.hpatch = hpatch
-    self.height = 370
+    
+    self.height = 185
     self.width = 1242;
+    
     self.nb_epi_per_image = 32; 
         
     if setName == 'kitti' or setName == 'kitti_ext' then
@@ -74,8 +78,6 @@ local unsupKITTI = torch.class('unsupKITTI')
           nFrame = 10
           nImg = n;
        else
-          --nFrame = n % self.nbFrames
-          --nImg = n - nFrame*self.nbFrames;
           nFrame = n % self.nbFrames
           nImg = math.floor(n / nFrame);
        end 
@@ -106,8 +108,12 @@ local unsupKITTI = torch.class('unsupKITTI')
       -- cut ski
       actual_width  = im0:size(3)
       actual_height = im0:size(2)
---      im0 = im0:narrow(2, actual_height - self.height + 1, self.height)
---      im1 = im1:narrow(2, actual_height - self.height  + 1, self.height)
+      
+      if self.crop then
+        im0 = im0:narrow(2, actual_height - self.height + 1, self.height)
+        im1 = im1:narrow(2, actual_height - self.height  + 1, self.height)
+      end
+      
       actual_height = im0:size(2)
     
       if( im0:size(3) ~= im1:size(3) ) then

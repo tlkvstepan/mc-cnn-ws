@@ -1,8 +1,0 @@
-th TRAIN_NET.lua debug contrast-dprog kitti -occ_th 1  -debug_fname contrast-dprog-occ1
-th TRAIN_NET.lua debug contrast-dprog kitti -occ_th 2  -debug_fname contrast-dprog-occ2
-th TRAIN_NET.lua debug contrast-dprog kitti -occ_th 4  -debug_fname contrast-dprog-occ4
-th TRAIN_NET.lua debug contrast-dprog kitti -occ_th 8  -debug_fname contrast-dprog-occ8
-th TRAIN_NET.lua debug contrast-dprog kitti -occ_th 16  -debug_fname contrast-dprog-occ16
-
-
-
